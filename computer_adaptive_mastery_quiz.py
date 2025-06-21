@@ -68,14 +68,14 @@ def assign_difficulty_label(estimated_pct):
         pct = int(estimated_pct)
     except:
         return None
-    if pct < 30: return 1
-    elif pct < 40: return 2
-    elif pct < 50: return 3
-    elif pct < 65: return 4
-    elif pct < 75: return 5
-    elif pct < 85: return 6
-    elif pct < 90: return 7
-    else: return 8
+    if pct < 30: return 8
+    elif pct < 40: return 7
+    elif pct < 50: return 6
+    elif pct < 65: return 5
+    elif pct < 75: return 4
+    elif pct < 85: return 3
+    elif pct < 90: return 2
+    else: return 1
 
 def group_by_difficulty(questions):
     groups = {i: [] for i in range(1, 9)}
