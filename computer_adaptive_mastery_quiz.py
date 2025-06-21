@@ -110,7 +110,7 @@ st.title("Ascend Quiz")
 
 if "all_questions" not in st.session_state:
     st.markdown("""
-## 🎓 Adaptive Mastery Quiz Generator
+## 🎓Ascend Quiz: Adaptive Mastery Generator
 
 Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
 
