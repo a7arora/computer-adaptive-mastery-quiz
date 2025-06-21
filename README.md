@@ -1,10 +1,10 @@
-🌟 StarQuiz: AI-Powered Computer-Adaptive Mastery-Based Quizzing from Any PDF
+🌟 Ascend Quiz: AI-Powered Computer-Adaptive Mastery-Based Quizzing from Any PDF
 
-StarQuiz is a fully functional Streamlit web app that automatically generates personalized, mastery-driven quizzes from any uploaded PDF (lecture notes, textbook excerpts, etc). Built with Groq’s meta-llama/llama-4-scout-17b-16e-instruct, the app uses generative AI to create high-quality, curriculum-agnostic assessments with adaptive difficulty and real-time feedback.
+Ascend Quiz is a fully functional Streamlit web app that automatically generates personalized, mastery-driven quizzes from any uploaded PDF (lecture notes, textbook excerpts, etc). Built with Groq’s meta-llama/llama-4-scout-17b-16e-instruct, the app uses generative AI to create high-quality, curriculum-agnostic assessments with adaptive difficulty and real-time feedback.
 
-🚀 Why It Matters: The Pedagogy Behind StarQuiz
+🚀 Why It Matters: The Pedagogy Behind Ascend Quiz
 
-StarQuiz is more than just an AI demo — it’s grounded in proven learning science and addresses three fundamental gaps in current edtech tools:
+Ascend Quiz is more than just an AI demo — it’s grounded in proven learning science and addresses three fundamental gaps in current edtech tools:
 
 🧠 1. Mastery-Based Learning (MBL)
 
@@ -12,7 +12,7 @@ As popularized by Sal Khan, mastery-based learning ensures students fully grasp 
 
 Research shows that in MBL classrooms, the average student performs as well as the top 15% of traditional classrooms (Kulik et al., 1990).
 
-StarQuiz operationalizes this by ending quizzes only when a student demonstrates mastery — defined as correctly answering 5+ questions at high difficulty (Level 6+) with at least 75% accuracy.
+Ascend Quiz operationalizes this by ending quizzes only when a student demonstrates mastery — defined as correctly answering 5+ questions at high difficulty (Level 6+) with at least 75% accuracy.
 
 📈 2. Computer-Adaptive Testing (CAT)
 
@@ -20,7 +20,7 @@ CAT improves assessment accuracy by dynamically adjusting question difficulty ba
 
 A 2017 study in Journal of Educational Psychology showed that CAT leads to higher achievement, increased engagement, and greater test precision (Martin & Lazendic, 2017).
 
-StarQuiz uses predicted student accuracy (e.g. “72% of students likely get this right”) to adjust quiz difficulty in real time, starting at ~70% and adapting up or down after each response.
+Ascend Quiz uses predicted student accuracy (e.g. “72% of students likely get this right”) to adjust quiz difficulty in real time, starting at ~70% and adapting up or down after each response.
 
 🧪 3. The Power of Practice Testing
 
@@ -28,7 +28,7 @@ Decades of cognitive science highlight practice testing (retrieval practice) as 
 
 When students test themselves — especially with feedback — they retain more, close knowledge gaps, and better transfer knowledge to new contexts.
 
-StarQuiz builds in immediate feedback with explanations after every question, reinforcing learning via active recall and self-explanation.
+Ascend Quiz builds in immediate feedback with explanations after every question, reinforcing learning via active recall and self-explanation.
 
 🧠 How It Works
 
@@ -36,7 +36,7 @@ Upload ContentEducators upload a PDF (e.g., lecture notes, textbook chapters).
 
 Question Generation with Difficulty Estimation
 
-The LLM creates multiple-choice questions with:
+The LLM creates 15 multiple-choice questions with:
 
 4 answer options
 
@@ -78,9 +78,9 @@ Adaptive quiz engine dynamically selects next question
 
 Smart fallback engine searches nearby difficulty bands if needed
 
-🧹 Why StarQuiz Is Unique
+🧹 Why Ascend Quiz Is Unique
 
-No Rigid Curricula: Unlike ALEKS or IXL, StarQuiz works with any input content.
+No Rigid Curricula: Unlike ALEKS or IXL, Ascend Quiz works with any input content.
 
 Truly Adaptive: Combines real-time content generation + adaptive delivery — not just static question banks.
 
@@ -107,4 +107,3 @@ Khan, S. (2016). Let’s Teach for Mastery, Not Test Scores. TED Talk
 Martin, A.J., & Lazendic, G. (2017). Computer-adaptive testing: Implications for students’ achievement, motivation, and engagement. Journal of Educational Psychology.
 
 Roediger, H. L., & Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. Psychological Science.
-
