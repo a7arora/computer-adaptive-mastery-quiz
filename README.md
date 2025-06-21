@@ -36,7 +36,7 @@ Upload ContentEducators upload a PDF (e.g., lecture notes, textbook chapters).
 
 Question Generation with Difficulty Estimation
 
-The LLM creates 15 multiple-choice questions with:
+The LLM creates multiple-choice questions with:
 
 4 answer options
 
