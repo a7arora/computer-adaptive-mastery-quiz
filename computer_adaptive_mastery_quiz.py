@@ -109,6 +109,30 @@ def accuracy_on_levels(answers, levels):
 st.title("📘 Adaptive Mastery Quiz")
 
 if "all_questions" not in st.session_state:
+    st.markdown("""
+## 🎓 Adaptive Mastery Quiz Generator
+
+Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
+
+**How it works:**
+This app uses a large language model (LLM) and an adaptive difficulty engine to create 15 multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
+
+The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once you get 5 hard questions (difficulty level 6 or above) correct at a 75%+ rate, the system considers you to have achieved **mastery** and ends the quiz.
+
+Each question includes:
+- Four answer options
+- The correct answer
+- An explanation
+- A predicted correctness percentage
+
+Unlike static tools like Khanmigo, this app uses generative AI to dynamically create the quiz from **your own content** — no rigid question banks required.
+
+---
+
+🧠 **Built using the `meta-llama/llama-4-scout-17b` model via Groq**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience.
+
+---
+""")
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
