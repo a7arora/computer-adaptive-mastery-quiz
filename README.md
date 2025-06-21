@@ -1,20 +1,110 @@
-# computer-adaptive-mastery-quiz
-This project is a fully functional Streamlit web app that generates and delivers computer-adaptive, mastery-based quizzes from any uploaded PDF document. Using a large language model (LLM) and a dynamic difficulty engine, it personalizes assessment in real-time — adjusting questions based on student performance and estimating how many students would likely get each question correct.
+🌟 StarQuiz: AI-Powered Computer-Adaptive Mastery-Based Quizzing from Any PDF
 
-Built independently using the meta-llama/llama-4-scout-17b-16e-instruct model from Groq, the app turns uploaded educational content (like lecture notes or textbook excerpts) into 15 multiple-choice questions that vary in difficulty. The questions are automatically labeled with an estimated percent of students who would get them right, allowing for fine-grained control over quiz difficulty and personalization.
+StarQuiz is a fully functional Streamlit web app that automatically generates personalized, mastery-driven quizzes from any uploaded PDF (lecture notes, textbook excerpts, etc). Built with Groq’s meta-llama/llama-4-scout-17b-16e-instruct, the app uses generative AI to create high-quality, curriculum-agnostic assessments with adaptive difficulty and real-time feedback.
 
-The heart of this app lies in its adaptive testing loop. The quiz starts at a medium difficulty level (questions expected to be answered correctly by ~70% of students). If the user answers correctly, the next question is made harder. If they answer incorrectly, it becomes easier. This closely mirrors the behavior of standardized computer-adaptive testing systems used in platforms like ALEKS and the GRE — but with real-time generation from any content.
+🚀 Why It Matters: The Pedagogy Behind StarQuiz
 
-Each question includes four options, a correct answer, an explanation, and a predicted correctness percentage. The app then groups these into 8 difficulty tiers (e.g., "very easy" to "very hard") based on the estimated correctness rates. This enables nuanced control and selection of follow-up questions that are neither too easy nor too frustrating, helping to maintain engagement while promoting learning.
+StarQuiz is more than just an AI demo — it’s grounded in proven learning science and addresses three fundamental gaps in current edtech tools:
 
-A key educational innovation in this app is its mastery tracking system. A student is considered to have “achieved mastery” when they answer at least five hard questions (difficulty level 6 or higher) with a minimum accuracy of 75%. The quiz then automatically ends and provides feedback on the student’s performance — creating an outcome-based assessment experience rather than one based on completion or fixed length.
+🧠 1. Mastery-Based Learning (MBL)
 
-Unlike traditional quizzes or most AI-assisted quiz generators (such as Khanmigo), this tool does not rely on predefined curricula or rigid question banks. Instead, it uses generative AI to create quiz content dynamically based on user-uploaded PDFs — allowing maximum flexibility for educators across subjects and grade levels.
+As popularized by Sal Khan, mastery-based learning ensures students fully grasp a concept before moving on, unlike traditional models that allow learning gaps to accumulate.
 
-The backend includes a call_groq_api function that queries the LLM with a structured prompt to return JSON-formatted question objects. These are parsed, difficulty-ranked, and fed into the adaptive engine. The frontend, built entirely in Streamlit, manages session state, user interaction, and quiz progression through a clean, minimal interface.
+Research shows that in MBL classrooms, the average student performs as well as the top 15% of traditional classrooms (Kulik et al., 1990).
 
-Another important feature is immediate feedback. After each submission, users are told whether they were correct and are shown the rationale behind the correct answer. This real-time feedback loop encourages reflective learning and aligns with the pedagogical principles of active recall and spaced repetition.
+StarQuiz operationalizes this by ending quizzes only when a student demonstrates mastery — defined as correctly answering 5+ questions at high difficulty (Level 6+) with at least 75% accuracy.
 
-Technically, the app supports robust error handling, intelligent fallback if questions of a certain difficulty are exhausted, and even smart difficulty search (searching nearby levels if the exact difficulty isn’t available). These engineering details help maintain a seamless user experience even in edge cases.
+📈 2. Computer-Adaptive Testing (CAT)
 
-In sum, this app represents a working proof-of-concept for what modern AI can bring to personalized education. It combines mastery learning, computer-adaptive testing, and generative AI into a single, interactive experience. It goes beyond existing educational tools by adapting not just content delivery, but content generation, difficulty estimation, and instructional feedback — all in real time.
+CAT improves assessment accuracy by dynamically adjusting question difficulty based on a student's responses.
+
+A 2017 study in Journal of Educational Psychology showed that CAT leads to higher achievement, increased engagement, and greater test precision (Martin & Lazendic, 2017).
+
+StarQuiz uses predicted student accuracy (e.g. “72% of students likely get this right”) to adjust quiz difficulty in real time, starting at ~70% and adapting up or down after each response.
+
+🧪 3. The Power of Practice Testing
+
+Decades of cognitive science highlight practice testing (retrieval practice) as one of the most effective learning strategies.
+
+When students test themselves — especially with feedback — they retain more, close knowledge gaps, and better transfer knowledge to new contexts.
+
+StarQuiz builds in immediate feedback with explanations after every question, reinforcing learning via active recall and self-explanation.
+
+🧠 How It Works
+
+Upload ContentEducators upload a PDF (e.g., lecture notes, textbook chapters).
+
+Question Generation with Difficulty Estimation
+
+The LLM creates 15 multiple-choice questions with:
+
+4 answer options
+
+Correct answer + explanation
+
+Predicted correctness percentage (e.g. 68% of students expected to get this right)
+
+Adaptive Quiz Loop
+
+Starts with a medium-difficulty question (~70% correctness)
+
+Correct answer → harder question
+
+Incorrect answer → easier question
+
+Quiz stops when mastery is reached
+
+Mastery Determination
+
+Mastery is achieved when a student answers ≥5 high-difficulty questions correctly (with ≥75% accuracy).
+
+Results are presented alongside personalized feedback.
+
+Difficulty Tiering & Error Handling
+
+Questions are grouped into 8 tiers (Very Easy → Very Hard)
+
+Fallback logic ensures smooth user experience even when certain difficulty levels are unavailable.
+
+🛠️ Technical Overview
+
+Frontend: Streamlit (clean UI, session-based state management)
+
+Backend:
+
+call_groq_api: Structured prompt querying for JSON-formatted question objects
+
+Adaptive quiz engine dynamically selects next question
+
+Smart fallback engine searches nearby difficulty bands if needed
+
+🧹 Why StarQuiz Is Unique
+
+No Rigid Curricula: Unlike ALEKS or IXL, StarQuiz works with any input content.
+
+Truly Adaptive: Combines real-time content generation + adaptive delivery — not just static question banks.
+
+Immediate Feedback: Every answer includes rationale and remediation support.
+
+Pedagogical Alignment: Synthesizes best practices in retrieval-based learning, mastery models, and adaptive testing — supported by decades of research.
+
+🧠 Future Directions
+
+Support for non-MCQ formats (short answer, open-ended)
+
+Integration with video uploads and transcript parsing
+
+Data collection pipelines to improve difficulty estimation models
+
+Teacher dashboards for group-level insights and intervention planning
+
+📚 References
+
+Kulik, C., Kulik, J., & Bangert-Drowns, R. (1990). Effectiveness of Mastery Learning Programs: A Meta-Analysis. Review of Educational Research.
+
+Khan, S. (2016). Let’s Teach for Mastery, Not Test Scores. TED Talk
+
+Martin, A.J., & Lazendic, G. (2017). Computer-adaptive testing: Implications for students’ achievement, motivation, and engagement. Journal of Educational Psychology.
+
+Roediger, H. L., & Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. Psychological Science.
+
