@@ -106,7 +106,7 @@ def accuracy_on_levels(answers, levels):
     return sum(filtered) / len(filtered) if filtered else 0
 
 # === STREAMLIT APP ===
-st.title("📘 Adaptive Mastery Quiz")
+st.title("Ascend Quiz")
 
 if "all_questions" not in st.session_state:
     st.markdown("""
