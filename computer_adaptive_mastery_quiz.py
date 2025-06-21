@@ -7,7 +7,13 @@ import re
 import random
 
 # === CONFIGURATION ===
-GROQ_API_KEY = "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"
+import streamlit as st
+import requests
+
+# Get the API key securely from Streamlit secrets
+API_KEY = st.secrets["GROQ_API_KEY"]
+
+headers = {"Authorization": f"Bearer {API_KEY}"}
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
 
