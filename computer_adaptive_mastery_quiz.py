@@ -109,11 +109,11 @@ def accuracy_on_levels(answers, levels):
     return sum(filtered) / len(filtered) if filtered else 0
 
 # === STREAMLIT APP ===
-st.title("Ascend Quiz")
+st.title("AscendQuiz")
 
 if "all_questions" not in st.session_state:
     st.markdown("""
-## 🎓Ascend Quiz: Computer Adaptive Mastery Quiz Generator
+## 🎓AscendQuiz: Computer Adaptive Mastery Quiz Generator
 
 Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
 
