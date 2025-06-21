@@ -197,7 +197,13 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
             selected_letter = selected.split(".")[0].strip().upper()
-            correct_index = q["options"].index(q["correct_answer"])
+            try:
+                correct_index = next(i for i, opt in enumerate(q["options"]) if opt.strip().lower() == q["correct_answer"].strip().lower())
+            except StopIteration:
+                st.error("⚠️ Question error: Correct answer not found in options.")
+                state["quiz_end"] = True
+                st.stop()
+
             correct_letter = ["A", "B", "C", "D"][correct_index]
             correct = (selected_letter == correct_letter)
 
