@@ -7,9 +7,6 @@ import re
 import random
 
 # === CONFIGURATION ===
-import streamlit as st
-import requests
-
 # Get the API key securely from Streamlit secrets
 API_KEY = st.secrets["GROQ_API_KEY"]
 
