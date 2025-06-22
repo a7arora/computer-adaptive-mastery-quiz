@@ -47,7 +47,7 @@ Passage:
 - "question_quality_rating": Score out of 10 indicating how well this question assesses learning objectives.
 - "question_quality_reasoning": Explain why you gave that quality rating.
 - "reasoning": Rationale for why this question was written.
-- "distractor_rationales": Dictionary where keys are 'A','B','C','D' and values explain why students might select that option.
+- "distractor_rationales": A dictionary with keys 'A', 'B', 'C', and 'D'. For each key, explain in 1-2 sentences **why a student might plausibly choose that option**, even though it is incorrect. Each explanation must be **specific to that option** and **grounded in the passage content**.
 
 **Critical constraints:**
 - Avoid vague wording.
@@ -77,8 +77,16 @@ def clean_response_text(text):
 
 def parse_question_json(text):
     try:
-        return json.loads(clean_response_text(text))
-    except Exception:
+        raw_data = json.loads(clean_response_text(text))
+        for q in raw_data:
+            if "distractor_rationales" not in q or not isinstance(q["distractor_rationales"], dict):
+                q["distractor_rationales"] = {}
+            for i, label in enumerate(["A", "B", "C", "D"]):
+                if label not in q["distractor_rationales"]:
+                    q["distractor_rationales"][label] = "No rationale provided for this option."
+        return raw_data
+    except Exception as e:
+        print(f"JSON parsing error: {e}")
         return []
 
 def assign_difficulty_label(estimated_pct):
@@ -120,9 +128,7 @@ def get_next_question(curr_diff, asked, all_qs):
     return None, None, None
 
 def normalize_answer(ans):
-    # Normalize for minor formatting differences
-    ans = ans.replace(" ", "").replace("\\_", "_").lower()
-    return ans
+    return ans.replace(" ", "").replace("\\_", "_").lower()
 
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
@@ -227,11 +233,9 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 st.error("❌ Incorrect.")
             st.write(f"**Explanation:** {state['last_explanation']}")
 
-            if not state["last_correct"]:
-                distractors = q.get("distractor_rationales", {})
-                rationale = distractors.get(state["selected_letter"], None)
-                if rationale:
-                    st.write(f"**Why you might have picked {state['selected_letter']}:** {rationale}")
+            distractors = q.get("distractor_rationales", {})
+            rationale = distractors.get(state["selected_letter"], None)
+            st.write(f"**Why you might have picked {state['selected_letter']}:** {rationale or 'No rationale provided.'}")
 
             if st.button("Next Question"):
                 state["current_difficulty"] = min(8, state["current_difficulty"] + 1) if state["last_correct"] else max(1, state["current_difficulty"] - 1)
