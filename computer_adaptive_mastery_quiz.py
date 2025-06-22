@@ -122,10 +122,12 @@ def accuracy_on_levels(answers, levels):
 st.title("AscendQuiz")
 
 if "all_questions" not in st.session_state:
-    st.markdown("""
-## \ud83c\udf93AscendQuiz: Computer Adaptive Mastery Quiz Generator
+    st.markdown(r"""
+## 🎓AscendQuiz: Computer Adaptive Mastery Quiz Generator
 
 Upload a PDF of your class notes, and this app will turn it into a personalized adaptive quiz.
+
+...
 """)
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
