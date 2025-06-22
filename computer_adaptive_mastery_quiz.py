@@ -174,7 +174,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 }
                 st.success("✅ Questions generated! Starting the quiz...")
                 st.session_state.quiz_ready = True
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("No questions were generated.")
 
@@ -248,7 +248,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 state["current_q"] = None
                 state["current_q_idx"] = None
                 state["show_explanation"] = False
-                st.experimental_rerun()
+                st.rerun()
 
     elif state["quiz_end"]:
         acc = accuracy_on_levels(state["answers"], [6, 7, 8])
@@ -266,4 +266,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             del st.session_state.questions_by_difficulty
             del st.session_state.quiz_state
             del st.session_state.quiz_ready
-            st.experimental_rerun()
+            st.rerun()
