@@ -174,7 +174,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 }
                 st.success("✅ Questions generated! Starting the quiz...")
                 st.session_state.quiz_ready = True
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("No questions were generated.")
 
@@ -198,19 +198,26 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
         st.write(q["question"])
-        options = [f"{label}. {text}" for label, text in zip(["A", "B", "C", "D"], q["options"])]
+
+        # Display options as "A. Option text" (no duplicated letter)
+        option_labels = ["A", "B", "C", "D"]
+        options = [f"{label}. {text}" for label, text in zip(option_labels, q["options"])]
         selected = st.radio("Select your answer:", options=options, key=f"radio_{idx}")
 
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
+            # Extract selected letter (before the dot)
             selected_letter = selected.split(".")[0].strip().upper()
-            try:
-                correct_index = next(i for i, opt in enumerate(q["options"]) if opt.strip().lower() == q["correct_answer"].strip().lower())
-            except StopIteration:
-                st.error("⚠️ Question error: Correct answer not found in options.")
+
+            # Map correct_answer letter to index
+            letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
+            correct_letter = q["correct_answer"].strip().upper()
+            correct_index = letter_to_index.get(correct_letter, None)
+
+            if correct_index is None:
+                st.error("⚠️ Question error: Correct answer letter invalid.")
                 state["quiz_end"] = True
                 st.stop()
 
-            correct_letter = ["A", "B", "C", "D"][correct_index]
             correct = (selected_letter == correct_letter)
 
             # Record answer
@@ -241,7 +248,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 state["current_q"] = None
                 state["current_q_idx"] = None
                 state["show_explanation"] = False
-                st.rerun()
+                st.experimental_rerun()
 
     elif state["quiz_end"]:
         acc = accuracy_on_levels(state["answers"], [6, 7, 8])
@@ -259,4 +266,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             del st.session_state.questions_by_difficulty
             del st.session_state.quiz_state
             del st.session_state.quiz_ready
-            st.rerun()
+            st.experimental_rerun()
