@@ -26,17 +26,18 @@ You are an educational assistant helping teachers generate multiple choice quest
 Given the following passage or notes, generate exactly 15 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty.
 
 **Requirements**:
-- 5 easy (\u226585%), 5 medium (60–84%), 5 hard (<60%)
+- 5 easy (≥85%), 5 medium (60–84%), 5 hard (<60%)
 
 **Each question must include**:
 - "question", "options", "correct_answer", "explanation", "estimated_correct_pct", "reasoning"
-- Also add "option_feedback": a dictionary with one explanation per option, e.g. {"A": "...", "B": "...", "C": "...", "D": "..."}
+- Also add "option_feedback": a dictionary with one explanation per option, e.g. {{"A": "...", "B": "...", "C": "...", "D": "..."}}
 
 Return only a valid JSON list of exactly 15 dictionaries.
 
 Passage:
 {text_chunk}
 """
+
 
 def call_groq_api(prompt):
     headers = {
