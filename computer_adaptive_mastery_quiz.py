@@ -28,8 +28,14 @@ Given the following passage or notes, generate exactly 15 multiple choice questi
 **Requirements**:
 - 5 easy (≥85%), 5 medium (60–84%), 5 hard (<60%)
 
-**Each question must include**:
-- "question", "options", "correct_answer", "explanation", "estimated_correct_pct", "reasoning"
+**Each question must include the following fields:**
+
+- "question": A clear and concise question directly related to the passage.
+- "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D".
+- "correct_answer": The letter ("A", "B", "C", or "D") corresponding to the correct option.
+- "explanation": A detailed explanation of why the correct answer is right and why the other options are incorrect, referencing the passage.
+- "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category).
+- "reasoning": A brief rationale explaining why the question fits its difficulty category, considering factors such as complexity, inference required, or detail recall.
 
 Return only a valid JSON list of exactly 15 dictionaries.
 
