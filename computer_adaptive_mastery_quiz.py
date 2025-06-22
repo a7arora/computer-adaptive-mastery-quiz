@@ -30,11 +30,11 @@ Given the following passage or notes, generate exactly 15 multiple choice questi
 
 **Each question must include the following fields:**
 
-- "question": A clear and concise question directly related to the passage.
+- "question": A clear, concise, and unambiguous question directly related to the passage that aligns with key learning objectives. The question should be cognitively appropriate for the specified difficulty level, encouraging critical thinking, application, analysis, or synthesis rather than rote recall. Avoid overly complex wording or ambiguity to ensure students understand exactly what is being asked.
 - "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D".
 - "correct_answer": The letter ("A", "B", "C", or "D") corresponding to the correct option.
-- "explanation": A detailed explanation of why the correct answer is right and why the other options are incorrect, referencing the passage.
-- "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category).
+- "explanation": A detailed explanation that clearly states why the correct answer choice (including its letter and full text) is right, referencing specific content from the passage. For each incorrect option, explicitly mention its letter and full answer text, and explain why that choice is incorrect or less accurate based on the passage.
+- "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, or detail recall.
 - "reasoning": A brief rationale explaining why the question fits its difficulty category, considering factors such as complexity, inference required, or detail recall.
 
 Return only a valid JSON list of exactly 15 dictionaries.
