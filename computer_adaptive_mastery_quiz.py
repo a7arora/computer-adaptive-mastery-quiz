@@ -5,11 +5,12 @@ import requests
 import json
 import re
 import random
-import html
 
 # === CONFIGURATION ===
+# Get the API key securely from Streamlit secrets
 API_KEY = st.secrets["GROQ_API_KEY"]
-HEADERS_JSON = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+
+headers = {"Authorization": f"Bearer {API_KEY}"}
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
 
@@ -20,43 +21,27 @@ def extract_text_from_pdf(pdf_file):
 
 def generate_prompt(text_chunk):
     return f"""
-You are an expert educational content designer with experience in assessment development, instructional design, and psychometrics. Your task is to generate high-quality multiple choice questions from the provided academic text. Prioritize clarity, validity, and pedagogical value.
+You are an educational assistant helping teachers generate multiple choice questions from a passage.
+
+Given the following passage or notes, generate exactly 15 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty.
+
+**Requirements**:
+- 5 easy (≥85%), 5 medium (60–84%), 5 hard (<60%)
+
+**Each question must include**:
+- "question", "options", "correct_answer", "explanation", "estimated_correct_pct", "reasoning"
+
+Return only a valid JSON list of exactly 15 dictionaries.
 
 Passage:
 {text_chunk}
-
-**Your task:**
-- Generate exactly 15 multiple choice questions based on the above passage.
-- The questions must test comprehension, reasoning, and higher-order thinking — not just factual recall.
-- Use Bloom's Taxonomy: include a mix of knowledge, application, analysis, evaluation, and synthesis levels.
-- Avoid ambiguous, trivial, or overly literal questions.
-- When writing mathematical expressions or formulas, format them properly using LaTeX syntax, enclosed inside dollar signs $...$ for inline expressions.
-
-**Difficulty Distribution (based on estimated correct %):**
-- 5 easy (≥85% correct)
-- 5 medium (60–84% correct)
-- 5 hard (<60% correct)
-
-**For each question, return a dictionary with the following fields:**
-- "question": The question text (can include LaTeX inside $...$)
-- "options": A list of exactly 4 plausible, distinct answer choices (can include LaTeX inside $...$)
-- "correct_answer": The exact text of the correct option (must match one of the options verbatim)
-- "explanation": A concise, clear explanation of why the correct answer is correct.
-- "estimated_correct_pct": Estimated % of students who would correctly answer this question.
-- "estimated_correct_pct_reasoning": Data-driven justification for that estimated percentage.
-- "question_quality_rating": Score out of 10 indicating how well this question assesses learning objectives.
-- "question_quality_reasoning": Explain why you gave that quality rating.
-- "reasoning": Rationale for why this question was written.
-- "distractor_rationales": Dictionary where keys are 'A','B','C','D' and values explain why students might select that option.
-
-**Critical constraints:**
-- Avoid vague wording.
-- Ensure correct answer is unambiguously correct.
-- Ensure distractors are plausible but clearly incorrect upon reflection.
-- Return only valid JSON list of exactly 15 dictionaries. Do not include commentary or markdown.
 """
 
 def call_groq_api(prompt):
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
     data = {
         "model": MODEL_NAME,
         "messages": [
@@ -64,9 +49,9 @@ def call_groq_api(prompt):
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
-        "max_tokens": 4000
+        "max_tokens": 3500
     }
-    response = requests.post(GROQ_URL, headers=HEADERS_JSON, json=data)
+    response = requests.post(GROQ_URL, headers=headers, json=data)
     if response.status_code != 200:
         return None, response.text
     return response.json()["choices"][0]["message"]["content"], None
@@ -119,34 +104,44 @@ def get_next_question(curr_diff, asked, all_qs):
                     return d, *random.choice(candidates)
     return None, None, None
 
-def normalize_answer(ans):
-    # Normalize for minor formatting differences
-    ans = ans.replace(" ", "").replace("\\_", "_").lower()
-    return ans
-
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
 
-def render_text_with_latex(text):
-    if "$" in text:
-        st.latex(text)
-    else:
-        st.write(text)
-
 # === STREAMLIT APP ===
-st.title("AscendQuiz: LaTeX Adaptive Mastery Edition")
+st.title("AscendQuiz")
 
 if "all_questions" not in st.session_state:
     st.markdown("""
-## 🎓AscendQuiz — Now with LaTeX rendering!
-Upload your class notes or textbook PDF, and this app will generate mastery-based adaptive quizzes with detailed explanations, distractor rationales, difficulty ratings, and full LaTeX support for formulas.
+## 🎓AscendQuiz: Computer Adaptive Mastery Quiz Generator
+
+Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
+
+**How it works:**
+This app uses a large language model (LLM) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
+
+The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once you get 5 hard questions (difficulty level 6 or above) correct at a 75%+ rate, the system considers you to have achieved **mastery** and ends the quiz.
+
+Each question includes:
+- Four answer options
+- The correct answer
+- An explanation
+- A predicted correctness percentage
+
+Unlike static tools like Khanmigo, this app uses generative AI to dynamically create the quiz from **your own content** — no rigid question banks required.
+
+---
+
+🧠 **Built using the `meta-llama/llama-4-scout-17b` model via Groq**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience.
+
+---
 """)
-    uploaded_pdf = st.file_uploader("Upload PDF Notes", type="pdf")
+    uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
             chunks = extract_text_from_pdf(uploaded_pdf)
             grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
+
             all_questions = []
             for chunk in grouped_chunks[:5]:
                 prompt = generate_prompt(chunk)
@@ -156,6 +151,7 @@ Upload your class notes or textbook PDF, and this app will generate mastery-base
                     continue
                 parsed = parse_question_json(response_text)
                 all_questions.extend(parsed)
+
             if all_questions:
                 st.session_state.all_questions = all_questions
                 st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
@@ -170,11 +166,11 @@ Upload your class notes or textbook PDF, and this app will generate mastery-base
                     "last_correct": None,
                     "last_explanation": None,
                 }
-                st.success("✅ Questions generated! Starting quiz...")
+                st.success("✅ Questions generated! Starting the quiz...")
                 st.session_state.quiz_ready = True
                 st.rerun()
             else:
-                st.error("No questions generated.")
+                st.error("No questions were generated.")
 
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
@@ -195,27 +191,30 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         idx = state["current_q_idx"]
 
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
-        render_text_with_latex(q["question"])
-
-        option_labels = ["A", "B", "C", "D"]
-        for label, text in zip(option_labels, q["options"]):
-            st.write(f"{label}: ", unsafe_allow_html=True)
-            render_text_with_latex(text)
-
-        selected_letter = st.radio("Select your answer:", option_labels, key=f"radio_{idx}")
+        st.write(q["question"])
+        options = [f"{label}. {text}" for label, text in zip(["A", "B", "C", "D"], q["options"])]
+        selected = st.radio("Select your answer:", options=options, key=f"radio_{idx}")
 
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
-            state["selected_letter"] = selected_letter
-            correct_index = next(i for i, opt in enumerate(q["options"]) if normalize_answer(opt) == normalize_answer(q["correct_answer"]))
-            correct_letter = option_labels[correct_index]
+            selected_letter = selected.split(".")[0].strip().upper()
+            try:
+                correct_index = next(i for i, opt in enumerate(q["options"]) if opt.strip().lower() == q["correct_answer"].strip().lower())
+            except StopIteration:
+                st.error("⚠️ Question error: Correct answer not found in options.")
+                state["quiz_end"] = True
+                st.stop()
+
+            correct_letter = ["A", "B", "C", "D"][correct_index]
             correct = (selected_letter == correct_letter)
 
+            # Record answer
             state["asked"].add((state["current_difficulty"], idx))
             state["answers"].append((state["current_difficulty"], correct))
             state["last_correct"] = correct
             state["last_explanation"] = q["explanation"]
             state["show_explanation"] = True
 
+            # Check mastery
             hard_correct = [1 for d, c in state["answers"] if d >= 6 and c]
             if len(hard_correct) >= 5 and sum(hard_correct) / len(hard_correct) >= 0.75:
                 state["quiz_end"] = True
@@ -224,32 +223,34 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             if state["last_correct"]:
                 st.success("✅ Correct!")
             else:
-                st.error("❌ Incorrect.")
-            st.write(f"**Explanation:** {state['last_explanation']}")
-
-            if not state["last_correct"]:
-                distractors = q.get("distractor_rationales", {})
-                rationale = distractors.get(state["selected_letter"], None)
-                if rationale:
-                    st.write(f"**Why you might have picked {state['selected_letter']}:** {rationale}")
+                st.error(f"❌ Incorrect. {state['last_explanation']}")
 
             if st.button("Next Question"):
-                state["current_difficulty"] = min(8, state["current_difficulty"] + 1) if state["last_correct"] else max(1, state["current_difficulty"] - 1)
+                # Adjust difficulty based on correctness
+                if state["last_correct"]:
+                    state["current_difficulty"] = min(8, state["current_difficulty"] + 1)
+                else:
+                    state["current_difficulty"] = max(1, state["current_difficulty"] - 1)
+
                 state["current_q"] = None
                 state["current_q_idx"] = None
                 state["show_explanation"] = False
                 st.rerun()
 
     elif state["quiz_end"]:
-        acc = accuracy_on_levels(state["answers"], [6,7,8])
+        acc = accuracy_on_levels(state["answers"], [6, 7, 8])
         hard_attempts = len([1 for d, _ in state["answers"] if d >= 6])
         st.markdown("## Quiz Completed 🎉")
         st.markdown(f"Accuracy on hard questions: {acc:.0%} ({hard_attempts} hard questions attempted)")
+
         if acc >= 0.75 and hard_attempts >= 5:
-            st.success("🎉 Mastery Achieved! You scored 75%+ on hard questions.")
+            st.success("🎉 You have mastered the content, achieving 75%+ accuracy on hard questions. Great job!")
         else:
-            st.warning("Mastery not achieved. Keep practicing!")
+            st.warning("Mastery was not achieved. Please review the material and try again.")
+
         if st.button("Restart Quiz"):
-            for key in ["all_questions", "questions_by_difficulty", "quiz_state", "quiz_ready"]:
-                del st.session_state[key]
+            del st.session_state.all_questions
+            del st.session_state.questions_by_difficulty
+            del st.session_state.quiz_state
+            del st.session_state.quiz_ready
             st.rerun()
