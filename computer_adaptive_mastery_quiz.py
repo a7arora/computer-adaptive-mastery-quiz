@@ -7,12 +7,14 @@ import re
 import random
 
 # === CONFIGURATION ===
+# Get the API key securely from Streamlit secrets
 API_KEY = st.secrets["GROQ_API_KEY"]
+
+headers = {"Authorization": f"Bearer {API_KEY}"}
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # === FUNCTION DEFINITIONS ===
-
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
     return [page.get_text() for page in doc if page.get_text().strip()]
@@ -28,7 +30,6 @@ Given the following passage or notes, generate exactly 15 multiple choice questi
 
 **Each question must include**:
 - "question", "options", "correct_answer", "explanation", "estimated_correct_pct", "reasoning"
-- Also add "option_feedback": a dictionary with one explanation per option, e.g. {{"A": "...", "B": "...", "C": "...", "D": "..."}}
 
 Return only a valid JSON list of exactly 15 dictionaries.
 
@@ -56,32 +57,14 @@ def call_groq_api(prompt):
     return response.json()["choices"][0]["message"]["content"], None
 
 def clean_response_text(text):
-    # Try to extract JSON inside ```json ... ```
-    match = re.search(r"```json\s*(\[[\s\S]*?\])\s*```", text, re.MULTILINE)
-    if match:
-        return match.group(1).strip()
-    # fallback: extract any JSON array anywhere
-    match = re.search(r"(\[[\s\S]*\])", text, re.MULTILINE)
-    if match:
-        return match.group(1).strip()
-    # fallback: return raw text (likely invalid JSON)
-    return text.strip()
+    match = re.search(r"```(?:json)?\s*(.*?)```", text.strip(), re.DOTALL)
+    return match.group(1).strip() if match else text.strip()
 
 def parse_question_json(text):
-    cleaned = clean_response_text(text)
     try:
-        questions = json.loads(cleaned)
-        questions = [normalize_question_options(q) for q in questions]
-        return questions, None
-    except Exception as e:
-        return None, f"JSON parse error: {e}\nRaw text:\n{cleaned}"
-
-def normalize_question_options(q):
-    opts = q.get("options")
-    if isinstance(opts, dict):
-        ordered_opts = [opts.get(letter, "") for letter in ["A", "B", "C", "D"]]
-        q["options"] = ordered_opts
-    return q
+        return json.loads(clean_response_text(text))
+    except Exception:
+        return []
 
 def assign_difficulty_label(estimated_pct):
     try:
@@ -121,8 +104,11 @@ def get_next_question(curr_diff, asked, all_qs):
                     return d, *random.choice(candidates)
     return None, None, None
 
-# === STREAMLIT APP ===
+def accuracy_on_levels(answers, levels):
+    filtered = [c for d, c in answers if d in levels]
+    return sum(filtered) / len(filtered) if filtered else 0
 
+# === STREAMLIT APP ===
 st.title("AscendQuiz")
 
 if "all_questions" not in st.session_state:
@@ -150,7 +136,6 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
 ---
 """)
-
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
@@ -164,11 +149,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 if error:
                     st.error("API error: " + error)
                     continue
-                parsed, parse_error = parse_question_json(response_text)
-                if parse_error:
-                    st.error(parse_error)
-                    st.text_area("Raw API Response", response_text, height=300)
-                    continue
+                parsed = parse_question_json(response_text)
                 all_questions.extend(parsed)
 
             if all_questions:
@@ -184,7 +165,6 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                     "show_explanation": False,
                     "last_correct": None,
                     "last_explanation": None,
-                    "last_option_feedback": None,
                 }
                 st.success("✅ Questions generated! Starting the quiz...")
                 st.session_state.quiz_ready = True
@@ -192,7 +172,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
             else:
                 st.error("No questions were generated.")
 
-elif st.session_state.get("quiz_ready", False):
+elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
     state = st.session_state.quiz_state
 
@@ -218,53 +198,59 @@ elif st.session_state.get("quiz_ready", False):
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
             selected_letter = selected.split(".")[0].strip().upper()
             try:
-                correct_letter = q["correct_answer"].strip().upper()
-            except Exception:
-                st.error("⚠️ Question error: Correct answer not found.")
+                correct_index = next(i for i, opt in enumerate(q["options"]) if opt.strip().lower() == q["correct_answer"].strip().lower())
+            except StopIteration:
+                st.error("⚠️ Question error: Correct answer not found in options.")
                 state["quiz_end"] = True
                 st.stop()
 
+            correct_letter = ["A", "B", "C", "D"][correct_index]
             correct = (selected_letter == correct_letter)
 
             # Record answer
             state["asked"].add((state["current_difficulty"], idx))
             state["answers"].append((state["current_difficulty"], correct))
-
-            # Show explanation and feedback
-            state["show_explanation"] = True
             state["last_correct"] = correct
-            state["last_explanation"] = q.get("explanation", "")
-            state["last_option_feedback"] = q.get("option_feedback", {})
-            state["current_q"] = None
-            state["current_q_idx"] = None
+            state["last_explanation"] = q["explanation"]
+            state["show_explanation"] = True
 
-            st.rerun()
+            # Check mastery
+            hard_correct = [1 for d, c in state["answers"] if d >= 6 and c]
+            if len(hard_correct) >= 5 and sum(hard_correct) / len(hard_correct) >= 0.75:
+                state["quiz_end"] = True
 
-    if state.get("show_explanation", False):
-        correct = state["last_correct"]
-        st.markdown("### Explanation")
-        if correct:
-            st.success("✅ Correct!")
+        if state.get("show_explanation", False):
+            if state["last_correct"]:
+                st.success("✅ Correct!")
+            else:
+                st.error(f"❌ Incorrect. {state['last_explanation']}")
+
+            if st.button("Next Question"):
+                # Adjust difficulty based on correctness
+                if state["last_correct"]:
+                    state["current_difficulty"] = min(8, state["current_difficulty"] + 1)
+                else:
+                    state["current_difficulty"] = max(1, state["current_difficulty"] - 1)
+
+                state["current_q"] = None
+                state["current_q_idx"] = None
+                state["show_explanation"] = False
+                st.rerun()
+
+    elif state["quiz_end"]:
+        acc = accuracy_on_levels(state["answers"], [6, 7, 8])
+        hard_attempts = len([1 for d, _ in state["answers"] if d >= 6])
+        st.markdown("## Quiz Completed 🎉")
+        st.markdown(f"Accuracy on hard questions: {acc:.0%} ({hard_attempts} hard questions attempted)")
+
+        if acc >= 0.75 and hard_attempts >= 5:
+            st.success("🎉 You have mastered the content, achieving 75%+ accuracy on hard questions. Great job!")
         else:
-            st.error("❌ Incorrect.")
-        st.write(state["last_explanation"])
+            st.warning("Mastery was not achieved. Please review the material and try again.")
 
-        st.markdown("### Option Feedback")
-        for letter, feedback in state["last_option_feedback"].items():
-            st.write(f"**{letter}:** {feedback}")
-
-        if st.button("Next Question"):
-            state["show_explanation"] = False
-            st.rerun()
-
-    if state["quiz_end"]:
-        st.markdown("## Quiz Complete 🎉")
-        total = len(state["answers"])
-        correct_count = sum(1 for _, c in state["answers"] if c)
-        st.write(f"You answered {correct_count} out of {total} questions correctly.")
-        # Optionally add more stats or restart option
         if st.button("Restart Quiz"):
             del st.session_state.all_questions
             del st.session_state.questions_by_difficulty
             del st.session_state.quiz_state
+            del st.session_state.quiz_ready
             st.rerun()
