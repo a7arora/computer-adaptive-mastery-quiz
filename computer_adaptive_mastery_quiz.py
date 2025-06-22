@@ -5,7 +5,6 @@ import requests
 import json
 import re
 import random
-import ast
 
 # === CONFIGURATION ===
 API_KEY = st.secrets["GROQ_API_KEY"]
@@ -15,6 +14,7 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # === FUNCTION DEFINITIONS ===
+
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
     return [page.get_text() for page in doc if page.get_text().strip()]
@@ -38,7 +38,6 @@ Passage:
 {text_chunk}
 """
 
-
 def call_groq_api(prompt):
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -59,23 +58,34 @@ def call_groq_api(prompt):
     return response.json()["choices"][0]["message"]["content"], None
 
 def clean_response_text(text):
-    match = re.search(r"```(?:json)?\s*(.*?)```", text.strip(), re.DOTALL)
-    cleaned = match.group(1).strip() if match else text.strip()
-    cleaned = cleaned.replace('\t', '  ')
-    cleaned = re.sub(r",\s*}" , "}", cleaned)
-    cleaned = re.sub(r",\s*]" , "]", cleaned)
-    return cleaned
+    # Try to extract JSON inside ```json ... ```
+    match = re.search(r"```json\s*(\[[\s\S]*?\])\s*```", text, re.MULTILINE)
+    if match:
+        return match.group(1).strip()
+    # fallback: extract any JSON array anywhere
+    match = re.search(r"(\[[\s\S]*\])", text, re.MULTILINE)
+    if match:
+        return match.group(1).strip()
+    # fallback: return raw text (likely invalid JSON)
+    return text.strip()
 
 def parse_question_json(text):
     cleaned = clean_response_text(text)
     try:
-        return json.loads(cleaned)
-    except json.JSONDecodeError:
-        try:
-            return ast.literal_eval(cleaned)
-        except Exception as e:
-            st.error(f"\u274c JSON parse failed: {e}")
-            return []
+        questions = json.loads(cleaned)
+        # Normalize options if needed
+        questions = [normalize_question_options(q) for q in questions]
+        return questions, None
+    except Exception as e:
+        return None, f"JSON parse error: {e}\nRaw text:\n{cleaned}"
+
+def normalize_question_options(q):
+    opts = q.get("options")
+    # If options is a dict with keys A-D, convert to list ordered A-D
+    if isinstance(opts, dict):
+        ordered_opts = [opts.get(letter, "") for letter in ["A", "B", "C", "D"]]
+        q["options"] = ordered_opts
+    return q
 
 def assign_difficulty_label(estimated_pct):
     try:
@@ -123,12 +133,29 @@ def accuracy_on_levels(answers, levels):
 st.title("AscendQuiz")
 
 if "all_questions" not in st.session_state:
-    st.markdown(r"""
+    st.markdown("""
 ## 🎓AscendQuiz: Computer Adaptive Mastery Quiz Generator
 
-Upload a PDF of your class notes, and this app will turn it into a personalized adaptive quiz.
+Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
 
-...
+**How it works:**
+This app uses a large language model (LLM) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
+
+The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once you get 5 hard questions (difficulty level 6 or above) correct at a 75%+ rate, the system considers you to have achieved **mastery** and ends the quiz.
+
+Each question includes:
+- Four answer options
+- The correct answer
+- An explanation
+- A predicted correctness percentage
+
+Unlike static tools like Khanmigo, this app uses generative AI to dynamically create the quiz from **your own content** — no rigid question banks required.
+
+---
+
+🧠 **Built using the `meta-llama/llama-4-scout-17b` model via Groq**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience.
+
+---
 """)
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
@@ -143,12 +170,12 @@ Upload a PDF of your class notes, and this app will turn it into a personalized 
                 if error:
                     st.error("API error: " + error)
                     continue
-
-                # Show raw output for debugging
-                st.text("Raw model response:")
-                st.code(response_text[:1500], language="json")
-
-                parsed = parse_question_json(response_text)
+                parsed, parse_error = parse_question_json(response_text)
+                if parse_error:
+                    st.error(parse_error)
+                    # Optionally show raw response for debugging:
+                    st.text_area("Raw API Response", response_text, height=300)
+                    continue
                 all_questions.extend(parsed)
 
             if all_questions:
@@ -164,10 +191,11 @@ Upload a PDF of your class notes, and this app will turn it into a personalized 
                     "show_explanation": False,
                     "last_correct": None,
                     "last_explanation": None,
+                    "last_option_feedback": None,
                 }
-                st.success("\u2705 Questions generated! Starting the quiz...")
+                st.success("✅ Questions generated! Starting the quiz...")
                 st.session_state.quiz_ready = True
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("No questions were generated.")
 
@@ -197,56 +225,14 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
             selected_letter = selected.split(".")[0].strip().upper()
             try:
-                correct_index = next(i for i, opt in enumerate(q["options"]) if opt.strip().lower() == q["correct_answer"].strip().lower())
-            except StopIteration:
-                st.error("\u26a0\ufe0f Question error: Correct answer not found in options.")
+                correct_letter = q["correct_answer"].strip().upper()
+            except Exception:
+                st.error("⚠️ Question error: Correct answer not found.")
                 state["quiz_end"] = True
                 st.stop()
 
-            correct_letter = ["A", "B", "C", "D"][correct_index]
             correct = (selected_letter == correct_letter)
 
+            # Record answer
             state["asked"].add((state["current_difficulty"], idx))
-            state["answers"].append((state["current_difficulty"], correct))
-            state["last_correct"] = correct
-            state["last_explanation"] = q.get("option_feedback", {}).get(selected_letter, q["explanation"])
-            state["show_explanation"] = True
-
-            hard_correct = [1 for d, c in state["answers"] if d >= 6 and c]
-            if len(hard_correct) >= 5 and sum(hard_correct) / len(hard_correct) >= 0.75:
-                state["quiz_end"] = True
-
-        if state.get("show_explanation", False):
-            if state["last_correct"]:
-                st.success("\u2705 Correct!")
-            else:
-                st.error(f"\u274c Incorrect. {state['last_explanation']}")
-
-            if st.button("Next Question"):
-                if state["last_correct"]:
-                    state["current_difficulty"] = min(8, state["current_difficulty"] + 1)
-                else:
-                    state["current_difficulty"] = max(1, state["current_difficulty"] - 1)
-
-                state["current_q"] = None
-                state["current_q_idx"] = None
-                state["show_explanation"] = False
-                st.rerun()
-
-    elif state["quiz_end"]:
-        acc = accuracy_on_levels(state["answers"], [6, 7, 8])
-        hard_attempts = len([1 for d, _ in state["answers"] if d >= 6])
-        st.markdown("## Quiz Completed \ud83c\udf89")
-        st.markdown(f"Accuracy on hard questions: {acc:.0%} ({hard_attempts} hard questions attempted)")
-
-        if acc >= 0.75 and hard_attempts >= 5:
-            st.success("\ud83c\udf89 You have mastered the content, achieving 75%+ accuracy on hard questions. Great job!")
-        else:
-            st.warning("Mastery was not achieved. Please review the material and try again.")
-
-        if st.button("Restart Quiz"):
-            del st.session_state.all_questions
-            del st.session_state.questions_by_difficulty
-            del st.session_state.quiz_state
-            del st.session_state.quiz_ready
-            st.rerun()
+            state["
