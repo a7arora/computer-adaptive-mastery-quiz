@@ -177,11 +177,18 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         idx = state["current_q_idx"]
 
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
-        st.markdown(q["question"], unsafe_allow_html=True)
+        if "$" in q["question"] or "\\(" in q["question"]:
+            st.markdown(q["question"])  # Use plain markdown for LaTeX to render
+        else:
+            st.markdown(q["question"], unsafe_allow_html=True)
 
         option_labels = ["A", "B", "C", "D"]
         for label, text in zip(option_labels, q["options"]):
-            st.markdown(f"**{label}.** {text}", unsafe_allow_html=True)
+            if "$" in text or "\\(" in text:
+                st.markdown(f"**{label}.** {text}")
+            else:
+                st.markdown(f"**{label}.** {text}", unsafe_allow_html=True)
+
         selected = st.radio("Select your answer:", options=option_labels, key=f"radio_{idx}")
 
 
