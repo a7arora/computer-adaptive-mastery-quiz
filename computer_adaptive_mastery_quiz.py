@@ -180,9 +180,15 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         st.markdown(q["question"], unsafe_allow_html=True)
 
         option_labels = ["A", "B", "C", "D"]
-        options = [f"{label}. {text}" for label, text in zip(option_labels, q["options"])]
-        selected = st.radio("Select your answer:", options=options, key=f"radio_{idx}")
-
+        st.markdown("**Options:**")
+        for label, text in zip(option_labels, q["options"]):
+            # This allows LaTeX rendering using $...$ or $$...$$
+            st.markdown(f"**{label}.** {text}", unsafe_allow_html=True)
+        selected = st.radio(
+            "Select your answer:",
+            options=option_labels,
+            key=f"radio_{idx}_letter"
+        )
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
             selected_letter = selected.split(".")[0].strip().upper()
             correct_letter = q["correct_answer"].strip().upper()
