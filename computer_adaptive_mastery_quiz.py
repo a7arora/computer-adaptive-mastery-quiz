@@ -25,6 +25,8 @@ You are an educational assistant helping teachers generate multiple choice quest
 
 Given the following passage or notes, generate exactly 15 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty.
 
+You may use LaTeX formatting for math content, using `$...$` for inline and `$$...$$` for display equations.
+
 **Requirements**:
 - 5 easy (≥85%), 5 medium (60–84%), 5 hard (<60%)
 
@@ -113,6 +115,7 @@ def get_next_question(curr_diff, asked, all_qs):
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
+
 
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
