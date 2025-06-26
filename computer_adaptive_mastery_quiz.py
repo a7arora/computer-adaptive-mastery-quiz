@@ -23,7 +23,7 @@ def generate_prompt(text_chunk):
     return f"""
 You are an educational assistant helping teachers generate multiple choice questions from a passage.
 
-Given the following passage or notes, generate exactly 15 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 15 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
+Given the following passage or notes, generate exactly 15 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 15 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If it is not possible to create 15 questions, create as many as you can.
 
 **Requirements**:
 - 5 easy (≥85%), 5 medium (60–84%), 5 hard (<60%)
