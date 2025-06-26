@@ -145,7 +145,11 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
             chunks = extract_text_from_pdf(uploaded_pdf)
-            grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
+            # Adaptive chunking
+            if len(chunks) <= 2:
+                grouped_chunks = ["\n\n".join(chunks)]  # Treat as one full chunk
+            else:
+                grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
 
             all_questions = []
             for chunk in grouped_chunks[:5]:
