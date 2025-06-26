@@ -119,8 +119,6 @@ st.title("AscendQuiz")
 
 if "all_questions" not in st.session_state:
     st.markdown("""
-## 🎓AscendQuiz: Computer Adaptive Mastery Quiz Generator
-
 Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
 
 **How it works:**
@@ -142,6 +140,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
 ---
 """)
+
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
