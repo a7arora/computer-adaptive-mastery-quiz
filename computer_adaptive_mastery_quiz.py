@@ -127,6 +127,9 @@ def get_next_question(curr_diff, asked, all_qs):
             return d, *random.choice(candidates)
 
     return None, None, None  # No questions left
+def accuracy_on_levels(answers, levels):
+    filtered = [c for d, c in answers if d in levels]
+    return sum(filtered) / len(filtered) if filtered else 0
 
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
