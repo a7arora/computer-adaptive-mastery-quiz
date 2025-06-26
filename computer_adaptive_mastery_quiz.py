@@ -33,7 +33,15 @@ Given the following passage or notes, generate exactly 15 multiple choice questi
 - "question": A clear, concise, and unambiguous question directly related to the passage that aligns with key learning objectives. The question should be designed to test understanding of material covered in the passage and should be made so it could show up on an educational assessment testing material from this passage. The question should be cognitively appropriate for the specified difficulty level, encouraging critical thinking, application, analysis, or synthesis rather than rote recall if not at the easiest difficulty level. Avoid overly complex wording or ambiguity to ensure students understand exactly what is being asked. Furthermore, make sure that the question has all the context in itself and does not reference specific figures or pages in the passage, as the question is designed for the user to do independently without the passage.
 - "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D"(with one of them being the correct answer). If the question is of medium or hard difficulty, please come up with wrong answers that are ones that a user who does not know the concept well or makes an error would select. Please make sure that only one answer choice is correct by solving the problem and checking all of the answer choices carefully and thoroughly.
 - "correct_answer": The letter ("A", "B", "C", or "D") corresponding to the correct option.
-- "explanation": A deep, pedagogically useful explanation that teaches the student **why** the correct answer is right and the others are wrong. It should: 1) Start by identifying the correct letter and its full text., 2) Then **explain the reasoning or concept** behind it in a way that would help a confused student understand — using analogies, examples, or logic as needed. Avoid simply saying “According to the passage” or restating the answer., 3) For each wrong option, name its letter and full text, then explain **why it’s wrong or misleading**, including what error a student might make if they chose it., 4) If relevant, clarify common misconceptions or subtle differences. This explanation should act like a mini-tutorial, helping students learn from their mistake or reinforce their understanding.
+- "explanation": A deep, pedagogically useful explanation that **teaches the concept** behind the correct answer and analyzes the flaws in the others. The explanation must:
+    1. Start by stating the correct letter and full answer.
+    2. Teach **why** that answer is correct using **conceptual reasoning** — including how the mechanism works, or why the property matters — not just restating facts.
+       - For example, if the correct answer is "correlation between features degrades performance," then explain **why correlated features reduce tree diversity in Random Forests**, which is the core reason performance drops.
+       - Use step-by-step reasoning, examples, or analogies when helpful.
+    3. For each incorrect answer, state its letter and text, and **explain why it's wrong**, including what misconception a student might have that could lead them to choose it.
+    4. The tone should be that of a **tutor or explainer**, helping a confused student understand both the correct idea and the traps in the wrong ones.
+
+Avoid vague phrases like “According to the passage.” Don’t just repeat the answer. Your goal is to help the student learn the concept by explaining it clearly and thoroughly.
 - "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, or detail recall.
 - "reasoning": A brief rationale explaining why the question fits its percentage correct assignment, considering factors such as complexity, inference required, or detail recall.
 
@@ -101,18 +109,24 @@ def pick_question(diff, asked, all_qs):
     return [(i, q) for i, q in enumerate(pool) if (diff, i) not in asked]
 
 def get_next_question(curr_diff, asked, all_qs):
-    for offset in range(0, 8):
-        for direction in [-1, 1]:
-            d = curr_diff + direction * offset
-            if 1 <= d <= 8:
-                candidates = pick_question(d, asked, all_qs)
-                if candidates:
-                    return d, *random.choice(candidates)
-    return None, None, None
+    # Try current difficulty first
+    candidates = pick_question(curr_diff, asked, all_qs)
+    if candidates:
+        return curr_diff, *random.choice(candidates)
 
-def accuracy_on_levels(answers, levels):
-    filtered = [c for d, c in answers if d in levels]
-    return sum(filtered) / len(filtered) if filtered else 0
+    # Search lower difficulties (nearest first)
+    for d in range(curr_diff - 1, 0, -1):
+        candidates = pick_question(d, asked, all_qs)
+        if candidates:
+            return d, *random.choice(candidates)
+
+    # Search higher difficulties (nearest first)
+    for d in range(curr_diff + 1, 9):
+        candidates = pick_question(d, asked, all_qs)
+        if candidates:
+            return d, *random.choice(candidates)
+
+    return None, None, None  # No questions left
 
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
