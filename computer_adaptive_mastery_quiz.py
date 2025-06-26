@@ -199,8 +199,13 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         st.write(q["question"])
 
         # Display options as "A. Option text" (no duplicated letter)
+        def strip_leading_label(text):
+            # Removes A), A., A:, A - etc.
+            return re.sub(r"^[A-Da-d][\).:\-]?\s+", "", text).strip()
+
         option_labels = ["A", "B", "C", "D"]
-        options = [f"{label}. {text}" for label, text in zip(option_labels, q["options"])]
+        cleaned_options = [strip_leading_label(opt) for opt in q["options"]]
+        options = [f"{label}. {text}" for label, text in zip(option_labels, cleaned_options)]
         selected = st.radio("Select your answer:", options=options, key=f"radio_{idx}")
 
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
