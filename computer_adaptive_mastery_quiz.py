@@ -7,7 +7,9 @@ import re
 import random
 
 # === CONFIGURATION ===
+# Get the API key securely from Streamlit secrets
 API_KEY = st.secrets["GROQ_API_KEY"]
+
 headers = {"Authorization": f"Bearer {API_KEY}"}
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
@@ -22,8 +24,6 @@ def generate_prompt(text_chunk):
 You are an educational assistant helping teachers generate multiple choice questions from a passage.
 
 Given the following passage or notes, generate exactly 15 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty.
-
-You may use LaTeX formatting for math content, using `$...$` for inline and `$$...$$` for display equations.
 
 **Requirements**:
 - 5 easy (≥85%), 5 medium (60–84%), 5 hard (<60%)
@@ -121,13 +121,33 @@ if "all_questions" not in st.session_state:
     st.markdown("""
 ## 🎓AscendQuiz: Computer Adaptive Mastery Quiz Generator
 
-Welcome to your personalized learning assistant...
+Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
+
+**How it works:**
+This app uses a large language model (LLM) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
+
+The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once you get 5 hard questions (difficulty level 6 or above) correct at a 75%+ rate, the system considers you to have achieved **mastery** and ends the quiz.
+
+Each question includes:
+- Four answer options
+- The correct answer
+- An explanation
+- A predicted correctness percentage
+
+Unlike static tools like Khanmigo, this app uses generative AI to dynamically create the quiz from **your own content** — no rigid question banks required.
+
+---
+
+🧠 **Built using the `meta-llama/llama-4-scout-17b` model via Groq**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience.
+
+---
 """)
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
             chunks = extract_text_from_pdf(uploaded_pdf)
             grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
+
             all_questions = []
             for chunk in grouped_chunks[:5]:
                 prompt = generate_prompt(chunk)
@@ -177,31 +197,37 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         idx = state["current_q_idx"]
 
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
-        if "$" in q["question"] or "\\(" in q["question"]:
-            st.markdown(q["question"])  # Use plain markdown for LaTeX to render
-        else:
-            st.markdown(q["question"], unsafe_allow_html=True)
+        st.write(q["question"])
 
+        # Display options as "A. Option text" (no duplicated letter)
         option_labels = ["A", "B", "C", "D"]
-        for label, text in zip(option_labels, q["options"]):
-            if "$" in text or "\\(" in text:
-                st.markdown(f"**{label}.** {text}")
-            else:
-                st.markdown(f"**{label}.** {text}", unsafe_allow_html=True)
-
-        selected = st.radio("Select your answer:", options=option_labels, key=f"radio_{idx}")
-
+        options = [f"{label}. {text}" for label, text in zip(option_labels, q["options"])]
+        selected = st.radio("Select your answer:", options=options, key=f"radio_{idx}")
 
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
+            # Extract selected letter (before the dot)
             selected_letter = selected.split(".")[0].strip().upper()
+
+            # Map correct_answer letter to index
+            letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
             correct_letter = q["correct_answer"].strip().upper()
+            correct_index = letter_to_index.get(correct_letter, None)
+
+            if correct_index is None:
+                st.error("⚠️ Question error: Correct answer letter invalid.")
+                state["quiz_end"] = True
+                st.stop()
+
             correct = (selected_letter == correct_letter)
+
+            # Record answer
             state["asked"].add((state["current_difficulty"], idx))
             state["answers"].append((state["current_difficulty"], correct))
             state["last_correct"] = correct
             state["last_explanation"] = q["explanation"]
             state["show_explanation"] = True
 
+            # Check mastery
             hard_correct = [1 for d, c in state["answers"] if d >= 6 and c]
             if len(hard_correct) >= 5 and sum(hard_correct) / len(hard_correct) >= 0.75:
                 state["quiz_end"] = True
@@ -210,10 +236,10 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             if state["last_correct"]:
                 st.success("✅ Correct!")
             else:
-                st.error("❌ Incorrect.")
-            st.markdown(state["last_explanation"], unsafe_allow_html=True)
+                st.error(f"❌ Incorrect. {state['last_explanation']}")
 
             if st.button("Next Question"):
+                # Adjust difficulty based on correctness
                 if state["last_correct"]:
                     state["current_difficulty"] = min(8, state["current_difficulty"] + 1)
                 else:
