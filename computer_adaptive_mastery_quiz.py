@@ -37,7 +37,7 @@ Given the following passage or notes, generate exactly 15 multiple choice questi
 - "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, or detail recall.
 - "reasoning": A brief rationale explaining why the question fits its percentage correct assignment, considering factors such as complexity, inference required, or detail recall.
 
-Return only a valid JSON list of exactly 15 dictionaries.
+Return a valid JSON list of up to 15 questions. If there is insufficient content, generate as many high-quality questions as possible (minimum 5).
 
 Passage:
 {text_chunk}
