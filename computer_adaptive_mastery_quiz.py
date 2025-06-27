@@ -264,17 +264,21 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 st.error(f"❌ Incorrect. {state['last_explanation']}")
 
             if st.button("Next Question"):
-                # Adjust difficulty based on correctness
+                available_difficulties = [d for d in range(1, 9) if all_qs.get(d)]
+                current = state["current_difficulty"]
+
                 if state["last_correct"]:
-                    state["current_difficulty"] = min(8, state["current_difficulty"] + 1)
+                    # Move to the next-lowest-higher-available difficulty
+                    next_diffs = sorted([d for d in available_difficulties if d > current])
                 else:
-                    state["current_difficulty"] = max(1, state["current_difficulty"] - 1)
+                    #Move to the next-highest-lower-available difficulty
+                    next_diffs = sorted([d for d in available_difficulties if d < current], reverse=True)
 
-                state["current_q"] = None
-                state["current_q_idx"] = None
-                state["show_explanation"] = False
-                st.rerun()
-
+                if next_diffs:
+                    state["current_difficulty"] = next_diffs[0]
+                else:
+                    # Stay at current difficulty if no direction is available
+                    state["current_difficulty"] = current
     elif state["quiz_end"]:
         acc = accuracy_on_levels(state["answers"], [6, 7, 8])
         hard_attempts = len([1 for d, _ in state["answers"] if d >= 6])
