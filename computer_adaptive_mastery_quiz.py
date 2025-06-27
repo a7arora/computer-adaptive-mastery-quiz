@@ -337,11 +337,22 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
             if st.button("Next Question"):
                 # Adjust difficulty
-                if state["last_correct"]:
-                    state["current_difficulty"] = min(state["current_difficulty"] + 1, 8)
-                else:
-                    state["current_difficulty"] = max(state["current_difficulty"] - 1, 1)
+                def find_next_difficulty(current_diff, going_up, asked, all_qs):
+                    diffs = range(current_diff + 1, 9) if going_up else range(current_diff - 1, 0, -1)
+                    for d in diffs:
+                        if pick_question(d, asked, all_qs):
+                            return d
+                    return current_diff  # fallback to current if no higher/lower available
 
+                # Adjust difficulty based on performance
+                if state["last_correct"]:
+                    state["current_difficulty"] = find_next_difficulty(
+                    state["current_difficulty"], going_up=True, asked=state["asked"], all_qs=all_qs
+                    )
+                else:
+                    state["current_difficulty"] = find_next_difficulty(
+                    state["current_difficulty"], going_up=False, asked=state["asked"], all_qs=all_qs
+                    )
                 # Clear current question to trigger fetching a new one
                 state["current_q"] = None
                 state["current_q_idx"] = None
