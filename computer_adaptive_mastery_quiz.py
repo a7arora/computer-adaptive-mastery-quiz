@@ -173,7 +173,10 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
 
             all_questions = []
-            for chunk in grouped_chunks[:5]:
+            # Pick first 2 chunks or duplicate the first if only one exists
+            chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
+
+            for chunk in chunks_to_use:
                 prompt = generate_prompt(chunk)
                 response_text, error = call_groq_api(prompt)
                 if error:
@@ -181,7 +184,6 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                     continue
                 parsed = parse_question_json(response_text)
                 all_questions.extend(parsed)
-
             if all_questions:
                 st.session_state.all_questions = all_questions
                 st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
