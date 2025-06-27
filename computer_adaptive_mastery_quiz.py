@@ -270,19 +270,27 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 state["last_correct"] = None
                 state["last_explanation"] = None
 
-                available_difficulties = [d for d in range(1, 9) if all_qs.get(d)]
-                current = state["current_difficulty"]
+    # Choose new difficulty direction
+                new_target = (
+                    state["current_difficulty"] + 1 if state["last_correct"]
+                    else state["current_difficulty"] - 1
+                )
 
-                if state["last_correct"]:
-                    next_diffs = sorted([d for d in available_difficulties if d > current])
-                else:
-                    next_diffs = sorted([d for d in available_difficulties if d < current], reverse=True)
+                # Use robust fallback search
+                next_diff, next_idx, next_q = get_next_question(
+                    curr_diff=new_target,
+                    asked=state["asked"],
+                    all_qs=all_qs
+                )
 
-                if next_diffs:
-                    state["current_difficulty"] = next_diffs[0]
+                if next_q is None:
+                    state["quiz_end"] = True
                 else:
-                    state["current_difficulty"] = current
-                st.rerun()
+                    state["current_q"] = next_q
+                    state["current_q_idx"] = next_idx
+                    state["current_difficulty"] = next_diff
+                    st.rerun()
+
     elif state["quiz_end"]:
         acc = accuracy_on_levels(state["answers"], [6, 7, 8])
         hard_attempts = len([1 for d, _ in state["answers"] if d >= 6])
