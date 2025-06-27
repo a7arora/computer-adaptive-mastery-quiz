@@ -282,6 +282,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 state["current_q"] = None
                 state["current_q_idx"] = None
                 state["show_explanation"] = False
+                st.rerun()
     elif state["quiz_end"]:
         acc = accuracy_on_levels(state["answers"], [6, 7, 8])
         hard_attempts = len([1 for d, _ in state["answers"] if d >= 6])
