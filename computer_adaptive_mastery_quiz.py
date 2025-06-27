@@ -134,9 +134,70 @@ def get_next_question(target_diff, asked, all_qs, going_up=True):
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
+def compute_mastery_score(answers):
+    # Define difficulty groups and weights
+    mastery_structure = {
+        (1, 2): 0.15,
+        (3, 4): 0.25,
+        (5, 6): 0.25,
+        (7, 8): 0.30
+    }
+
+    total_score = 0.0
+
+    for levels, weight in mastery_structure.items():
+        acc = accuracy_on_levels(answers, levels)
+        adjusted = max((acc - 0.25) / 0.75, 0)
+        total_score += weight * adjusted
+
+    return int(round(total_score * 100))  # Mastery out of 100
 
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
+def render_mastery_bar(score):
+    color = "red" if score < 30 else "yellow" if score < 70 else "green"
+    st.markdown(f"""
+    <style>
+        .mastery-bar-wrapper {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 9999;
+            background-color: white;
+            padding: 8px 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }}
+        .mastery-bar {{
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 24px;
+            width: 100%;
+            background-color: #eee;
+        }}
+        .mastery-bar-fill {{
+            height: 100%;
+            width: {score}%;
+            background-color: {color};
+            text-align: center;
+            color: white;
+            font-weight: bold;
+        }}
+        .spacer {{
+            height: 60px;
+        }}
+    </style>
+
+    <div class="mastery-bar-wrapper">
+        <div class="mastery-bar">
+            <div class="mastery-bar-fill">{score}%</div>
+        </div>
+    </div>
+    <div class="spacer"></div>
+    """, unsafe_allow_html=True)
+score = compute_mastery_score(st.session_state.get("quiz_state", {}).get("answers", []))
+render_mastery_bar(score)
 
 if "all_questions" not in st.session_state:
     st.markdown("""
