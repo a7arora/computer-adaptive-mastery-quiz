@@ -130,6 +130,21 @@ def get_next_question(curr_diff, asked, all_qs):
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
+def difficulty_weight(d):
+    return d ** 1.5
+def calculate_mastery_score(answers):
+    if not answers:
+        return 0
+    weighted_correct = sum(c * difficulty_weight(d) for d, c in answers)
+    total_weight = sum(difficulty_weight(d) for d, _ in answers)
+    return round(100 * weighted_correct / total_weight, 1)
+def mastery_color(score):
+    if score < 40:
+        return "red"
+    elif score < 70:
+        return "orange"
+    else:
+        return "green" 
 
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
@@ -201,7 +216,17 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
     state = st.session_state.quiz_state
-
+    # Display mastery score bar
+    mastery_score = calculate_mastery_score(state["answers"])
+    color = mastery_color(mastery_score)
+    st.markdown(f"""
+    <div style='margin-top:20px; margin-bottom:10px; font-weight:bold;'>📊 Mastery Progress</div>
+    <div style='background-color:#ddd; border-radius:10px; height:24px; width:100%;'>
+        <div style='background-color:{color}; width:{mastery_score}%; height:100%; border-radius:10px; text-align:center; color:white; font-weight:bold;'>
+        {mastery_score}%
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     if not state["quiz_end"]:
         if state["current_q"] is None and not state.get("show_explanation", False):
             diff, idx, q = get_next_question(state["current_difficulty"], state["asked"], all_qs)
