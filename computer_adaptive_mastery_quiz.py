@@ -135,7 +135,6 @@ def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
 def compute_mastery_score(answers):
-    # Define difficulty groups and weights
     mastery_structure = {
         (1, 2): 0.15,
         (3, 4): 0.25,
@@ -144,13 +143,19 @@ def compute_mastery_score(answers):
     }
 
     total_score = 0.0
+    total_weight = 0.0
 
     for levels, weight in mastery_structure.items():
         acc = accuracy_on_levels(answers, levels)
-        adjusted = max((acc - 0.25) / 0.75, 0)
-        total_score += weight * adjusted
+        if acc is not None:  # Only include levels with attempted questions
+            adjusted = max((acc - 0.25) / 0.75, 0)
+            total_score += weight * adjusted
+            total_weight += weight
 
-    return int(round(total_score * 100))  # Mastery out of 100
+    if total_weight == 0:
+        return 0  # Avoid divide-by-zero if no answers
+
+    return int(round((total_score / total_weight) * 100))
 
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
