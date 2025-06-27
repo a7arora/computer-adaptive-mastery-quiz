@@ -71,9 +71,10 @@ def call_groq_api(prompt):
     return response.json()["choices"][0]["message"]["content"], None
 
 def clean_response_text(text):
-    match = re.search(r"
-(?:json)?\s*(.*?)
-", text.strip(), re.DOTALL)
+    pattern = r"""
+    (?:json)?\s*(\{.*\})
+    """
+    match = re.search(pattern, text.strip(), re.DOTALL | re.VERBOSE)
     return match.group(1).strip() if match else text.strip()
 
 def parse_question_json(text):
