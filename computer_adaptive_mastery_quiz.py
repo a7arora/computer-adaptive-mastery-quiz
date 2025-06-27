@@ -264,32 +264,19 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 st.error(f"❌ Incorrect. {state['last_explanation']}")
 
             if st.button("Next Question"):
+                # Adjust difficulty
+                if state["last_correct"]:
+                    state["current_difficulty"] = min(state["current_difficulty"] + 1, 8)
+                else:
+                    state["current_difficulty"] = max(state["current_difficulty"] - 1, 1)
+
+                # Clear current question to trigger fetching a new one
                 state["current_q"] = None
                 state["current_q_idx"] = None
                 state["show_explanation"] = False
                 state["last_correct"] = None
                 state["last_explanation"] = None
-
-    # Choose new difficulty direction
-                new_target = (
-                    state["current_difficulty"] + 1 if state["last_correct"]
-                    else state["current_difficulty"] - 1
-                )
-
-                # Use robust fallback search
-                next_diff, next_idx, next_q = get_next_question(
-                    curr_diff=new_target,
-                    asked=state["asked"],
-                    all_qs=all_qs
-                )
-
-                if next_q is None:
-                    state["quiz_end"] = True
-                else:
-                    state["current_q"] = next_q
-                    state["current_q_idx"] = next_idx
-                    state["current_difficulty"] = next_diff
-                    st.rerun()
+                st.rerun()
 
     elif state["quiz_end"]:
         acc = accuracy_on_levels(state["answers"], [6, 7, 8])
