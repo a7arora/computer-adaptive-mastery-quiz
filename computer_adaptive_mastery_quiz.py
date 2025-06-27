@@ -108,25 +108,29 @@ def pick_question(diff, asked, all_qs):
     pool = all_qs.get(diff, [])
     return [(i, q) for i, q in enumerate(pool) if (diff, i) not in asked]
 
-def get_next_question(curr_diff, asked, all_qs):
-    # Try current difficulty first
-    candidates = pick_question(curr_diff, asked, all_qs)
+def get_next_question(target_diff, asked, all_qs, going_up=True):
+    # Try target difficulty first
+    candidates = pick_question(target_diff, asked, all_qs)
     if candidates:
-        return curr_diff, *random.choice(candidates)
+        return target_diff, *random.choice(candidates)
 
-    # Search lower difficulties (nearest first)
-    for d in range(curr_diff - 1, 0, -1):
+    # Directional search
+    range_fn = (
+        lambda: range(target_diff + 1, 9) if going_up else range(target_diff - 1, 0, -1)
+    )
+    for d in range_fn():
         candidates = pick_question(d, asked, all_qs)
         if candidates:
             return d, *random.choice(candidates)
 
-    # Search higher difficulties (nearest first)
-    for d in range(curr_diff + 1, 9):
+    # Final fallback: scan all
+    for d in range(1, 9):
         candidates = pick_question(d, asked, all_qs)
         if candidates:
             return d, *random.choice(candidates)
 
-    return None, None, None  # No questions left
+    return None, None, None
+
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
