@@ -71,9 +71,7 @@ def call_groq_api(prompt):
     return response.json()["choices"][0]["message"]["content"], None
 
 def clean_response_text(text):
-    match = re.search(r"
-(?:json)?\s*(.*?)
-", text.strip(), re.DOTALL)
+    match = re.search(r"```(?:json)?\s*(.*?)```", text.strip(), re.DOTALL)
     return match.group(1).strip() if match else text.strip()
 
 def parse_question_json(text):
@@ -132,21 +130,6 @@ def get_next_question(curr_diff, asked, all_qs):
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
-def difficulty_weight(d):
-    return d ** 1.5
-def calculate_mastery_score(answers):
-    if not answers:
-        return 0
-    weighted_correct = sum(c * difficulty_weight(d) for d, c in answers)
-    total_weight = sum(difficulty_weight(d) for d, _ in answers)
-    return round(100 * weighted_correct / total_weight, 1)
-def mastery_color(score):
-    if score < 40:
-        return "red"
-    elif score < 70:
-        return "orange"
-    else:
-        return "green" 
 
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
@@ -170,7 +153,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
 ---
 
-🧠 **Built using the meta-llama/llama-4-scout-17b model via Groq**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience.
+🧠 **Built using the `meta-llama/llama-4-scout-17b` model via Groq**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience.
 
 ---
 """)
@@ -218,17 +201,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
     state = st.session_state.quiz_state
-    # Display mastery score bar
-    mastery_score = calculate_mastery_score(state["answers"])
-    color = mastery_color(mastery_score)
-    st.markdown(f"""
-    <div style='margin-top:20px; margin-bottom:10px; font-weight:bold;'>📊 Mastery Progress</div>
-    <div style='background-color:#ddd; border-radius:10px; height:24px; width:100%;'>
-        <div style='background-color:{color}; width:{mastery_score}%; height:100%; border-radius:10px; text-align:center; color:white; font-weight:bold;'>
-        {mastery_score}%
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+
     if not state["quiz_end"]:
         if state["current_q"] is None and not state.get("show_explanation", False):
             diff, idx, q = get_next_question(state["current_difficulty"], state["asked"], all_qs)
@@ -306,10 +279,6 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 else:
                     # Stay at current difficulty if no direction is available
                     state["current_difficulty"] = current
-                state["current_q"] = None
-                state["current_q_idx"] = None
-                state["show_explanation"] = False
-                st.rerun()
     elif state["quiz_end"]:
         acc = accuracy_on_levels(state["answers"], [6, 7, 8])
         hard_attempts = len([1 for d, _ in state["answers"] if d >= 6])
@@ -326,4 +295,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             del st.session_state.questions_by_difficulty
             del st.session_state.quiz_state
             del st.session_state.quiz_ready
-            st.rerun() 
+            st.rerun()
