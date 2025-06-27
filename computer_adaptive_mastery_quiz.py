@@ -227,7 +227,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         option_labels = ["A", "B", "C", "D"]
         cleaned_options = [strip_leading_label(opt) for opt in q["options"]]
         options = [f"{label}. {text}" for label, text in zip(option_labels, cleaned_options)]
-        selected = st.radio("Select your answer:", options=options, key=f"radio_{idx}")
+        selected = st.radio("Select your answer:", options=options, key=f"radio_{idx}", index=None)
 
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
             # Extract selected letter (before the dot)
