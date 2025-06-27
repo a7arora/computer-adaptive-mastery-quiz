@@ -63,7 +63,7 @@ def call_groq_api(prompt):
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
-        "max_tokens": 7500
+        "max_tokens": 4500
     }
     response = requests.post(GROQ_URL, headers=headers, json=data)
     if response.status_code != 200:
@@ -71,10 +71,9 @@ def call_groq_api(prompt):
     return response.json()["choices"][0]["message"]["content"], None
 
 def clean_response_text(text):
-    pattern = r"""
-    (?:json)?\s*(\{.*\})
-    """
-    match = re.search(pattern, text.strip(), re.DOTALL | re.VERBOSE)
+    match = re.search(r"
+(?:json)?\s*(.*?)
+", text.strip(), re.DOTALL)
     return match.group(1).strip() if match else text.strip()
 
 def parse_question_json(text):
@@ -327,4 +326,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             del st.session_state.questions_by_difficulty
             del st.session_state.quiz_state
             del st.session_state.quiz_ready
-            st.rerun()
+            st.rerun() 
