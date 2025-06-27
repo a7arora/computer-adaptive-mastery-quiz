@@ -279,6 +279,9 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 else:
                     # Stay at current difficulty if no direction is available
                     state["current_difficulty"] = current
+                state["current_q"] = None
+                state["current_q_idx"] = None
+                state["show_explanation"] = False
     elif state["quiz_end"]:
         acc = accuracy_on_levels(state["answers"], [6, 7, 8])
         hard_attempts = len([1 for d, _ in state["answers"] if d >= 6])
