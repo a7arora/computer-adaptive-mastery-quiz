@@ -19,7 +19,36 @@ def extract_text_from_pdf(pdf_file):
     return [page.get_text() for page in doc if page.get_text().strip()]
 
 def generate_prompt(text_chunk):
-    return f"""..."""  # Unchanged prompt string — keep your original here
+    return f"""
+You are an educational assistant helping teachers generate multiple choice questions from a passage.
+
+Given the following passage or notes, generate exactly 15 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 15 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If the passage is too short to reasonably support 15 distinct questions, generate as many high-quality questions as possible (minimum of 5), ensuring they reflect varying difficulty.
+
+**Requirements**:
+- 5 easy (≥85%), 5 medium (60–84%), 5 hard (<60%)
+
+**Each question must include the following fields:**
+
+- "question": A clear, concise, and unambiguous question directly related to the passage that aligns with key learning objectives. The question should be designed to test understanding of material covered in the passage and should be made so it could show up on an educational assessment testing material from this passage. The question should be cognitively appropriate for the specified difficulty level, encouraging critical thinking, application, analysis, or synthesis rather than rote recall if not at the easiest difficulty level. Avoid overly complex wording or ambiguity to ensure students understand exactly what is being asked. Furthermore, make sure that the question has all the context in itself and does not reference specific figures or pages in the passage, as the question is designed for the user to do independently without the passage.
+- "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D"(with one of them being the correct answer). If the question is of medium or hard difficulty, please come up with wrong answers that are ones that a user who does not know the concept well or makes an error would select. Please make sure that only one answer choice is correct by solving the problem and checking all of the answer choices carefully and thoroughly.
+- "correct_answer": The letter ("A", "B", "C", or "D") corresponding to the correct option.
+- "explanation": A deep, pedagogically useful explanation that **teaches the concept** behind the correct answer and analyzes the flaws in the others. The explanation must:
+    1. Start by stating the correct letter and full answer.
+    2. Teach **why** that answer is correct using **conceptual reasoning** — including how the mechanism works, or why the property matters — not just restating facts.
+       - For example, if the correct answer is "correlation between features degrades performance," then explain **why correlated features reduce tree diversity in Random Forests**, which is the core reason performance drops.
+       - Use step-by-step reasoning, examples, or analogies when helpful.
+    3. For each incorrect answer, state its letter and text, and **explain why it's wrong**, including what misconception a student might have that could lead them to choose it.
+    4. The tone should be that of a **tutor or explainer**, helping a confused student understand both the correct idea and the traps in the wrong ones.
+
+Avoid vague phrases like “According to the passage.” Don’t just repeat the answer. Your goal is to help the student learn the concept by explaining it clearly and thoroughly.
+- "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, or detail recall.
+- "reasoning": A brief rationale explaining why the question fits its percentage correct assignment, considering factors such as complexity, inference required, or detail recall.
+
+Return a valid JSON list of up to 15 questions. If there is insufficient content, generate as many high-quality questions as possible (minimum 5).
+
+Passage:
+{text_chunk}
+"""
 
 def call_groq_api(prompt):
     headers = {
