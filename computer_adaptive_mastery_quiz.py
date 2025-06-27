@@ -216,8 +216,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         q = state["current_q"]
         idx = state["current_q_idx"]
 
-        question_number = len(state["asked"]) + 1
-        st.markdown(f"### Question {question_number}")
+        st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
         st.write(q["question"])
 
         # Display options as "A. Option text" (no duplicated letter)
