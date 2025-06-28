@@ -145,7 +145,8 @@ def compute_mastery_score(answers):
     return int(round((total_score / total_weight) * 100))
 
 def render_latex_or_markdown(text):
-    if any(tag in text for tag in ["$", "\\(", "\\["]):
-        st.markdown(text, unsafe_allow_html=True)
+    # If the whole text is a single LaTeX expression
+    if re.fullmatch(r"\$.*\$", text.strip()):
+        st.latex(text.strip('$'))  # Strip outer $ only
     else:
-        st.write(text)
+        st.markdown(text, unsafe_allow_html=True)  # Supports embedded LaTeX
