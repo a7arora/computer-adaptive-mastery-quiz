@@ -271,7 +271,11 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
-    state = st.session_state.quiz_state
+    state = st.session_state.get("quiz_state", None)
+
+    if state is None:
+        st.warning("Quiz state not found. Please restart the app or re-upload a PDF.")
+        st.stop()
 
     if not state["quiz_end"]:
         if state["current_q"] is None and not state.get("show_explanation", False):
