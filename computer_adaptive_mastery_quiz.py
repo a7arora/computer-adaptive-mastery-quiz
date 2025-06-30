@@ -165,7 +165,16 @@ def compute_mastery_score(answers):
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
 def render_mastery_bar(score):
-    color = "red" if score < 30 else "yellow" if score < 70 else "green"
+    if score < 30:
+        color = "red"
+        text_color = "white"
+    elif score < 70:
+        color = "yellow"
+        text_color = "black"
+    else:
+        color = "green"
+        text_color = "white"
+
     st.markdown(f"""
     <style>
         .mastery-bar-wrapper {{
@@ -191,8 +200,9 @@ def render_mastery_bar(score):
             width: {score}%;
             background-color: {color};
             text-align: center;
-            color: white;
+            color: {text_color};
             font-weight: bold;
+            line-height: 24px;
         }}
         .spacer {{
             height: 60px;
@@ -282,7 +292,8 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     if state is None:
         st.warning("Quiz state not found. Please restart the app or re-upload a PDF.")
         st.stop()
-
+    score = compute_mastery_score(state.get("answers", []))
+    render_mastery_bar(score)
     if not state["quiz_end"]:
         if state["current_q"] is None and not state.get("show_explanation", False):
             diff, idx, q = get_next_question(state["current_difficulty"], state["asked"], all_qs)
