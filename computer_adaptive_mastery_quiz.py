@@ -223,7 +223,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
 ---
 
-🧠 **Built using the `meta-llama/llama-4-scout-17b` model via Groq**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience.
+🧠 **Built using the `DeepSeek-R1-0528** model, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience.
 
 ---
 """)
