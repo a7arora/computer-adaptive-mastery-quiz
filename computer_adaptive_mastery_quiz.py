@@ -26,10 +26,10 @@ def generate_prompt(text_chunk):
     return f"""
 You are an educational assistant helping teachers generate multiple choice questions from a passage.
 
-Given the following passage or notes, generate exactly 15 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 15 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If the passage is too short to reasonably support 15 distinct questions, generate as many high-quality questions as possible (minimum of 5), ensuring they reflect varying difficulty.
+Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If the passage is too short to reasonably support 20 distinct questions, generate as many high-quality questions as possible (minimum of 5), ensuring they reflect varying difficulty.
 
 **Requirements**:
-- 5 easy (≥85%), 5 medium (60–84%), 5 hard (<60%)
+- 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard(<40%)
 
 **Each question must include the following fields:**
 
@@ -48,7 +48,7 @@ Avoid vague phrases like “According to the passage.” Don’t just repeat the
 - "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, or detail recall.
 - "reasoning": A brief rationale explaining why the question fits its percentage correct assignment, considering factors such as complexity, inference required, or detail recall.
 
-Return a valid JSON list of up to 15 questions. If there is insufficient content, generate as many high-quality questions as possible (minimum 5).
+Return a valid JSON list of up to 20 questions. If there is insufficient content, generate as many high-quality questions as possible (minimum 5).
 
 Passage:
 {text_chunk}
