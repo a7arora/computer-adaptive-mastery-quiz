@@ -8,11 +8,14 @@ import random
 
 # === CONFIGURATION ===
 # Get the API key securely from Streamlit secrets
-API_KEY = st.secrets["GROQ_API_KEY"]
+API_KEY = st.secrets["DEEPSEEK_API_KEY"]
 
-headers = {"Authorization": f"Bearer {API_KEY}"}
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL_NAME = "meta-llama/llama-4-scout-17b-16e-instruct"
+headers = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json"
+}
+DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
+MODEL_NAME = "deepseek-chat"  # or another supported model name
 
 # === FUNCTION DEFINITIONS ===
 def extract_text_from_pdf(pdf_file):
@@ -51,24 +54,21 @@ Passage:
 {text_chunk}
 """
 
-def call_groq_api(prompt):
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
+def call_deepseek_api(prompt):
     data = {
         "model": MODEL_NAME,
         "messages": [
-            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "system", "content": "You are a helpful educational assistant."},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
         "max_tokens": 4500
     }
-    response = requests.post(GROQ_URL, headers=headers, json=data)
+    response = requests.post(DEEPSEEK_URL, headers=headers, json=data)
     if response.status_code != 200:
         return None, response.text
     return response.json()["choices"][0]["message"]["content"], None
+
 
 def clean_response_text(text):
     match = re.search(r"```(?:json)?\s*(.*?)```", text.strip(), re.DOTALL)
@@ -244,7 +244,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
             for chunk in chunks_to_use:
                 prompt = generate_prompt(chunk)
-                response_text, error = call_groq_api(prompt)
+                response_text, error = call_deepseek_api(prompt)
                 if error:
                     st.error("API error: " + error)
                     continue
