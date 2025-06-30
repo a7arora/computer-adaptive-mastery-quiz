@@ -125,6 +125,12 @@ def find_next_difficulty(current_diff, going_up, asked, all_qs):
 
     # Fallback: stay at current level
     return current_diff
+def get_next_question(current_diff, asked, all_qs):
+    available = pick_question(current_diff, asked, all_qs)
+    if not available:
+        return current_diff, None, None
+    idx, q = random.choice(available)
+    return current_diff, idx, q
 
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
