@@ -130,28 +130,32 @@ def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
 def compute_mastery_score(answers):
-    mastery_structure = {
-        (1, 2): 0.15,
-        (3, 4): 0.25,
-        (5, 6): 0.25,
-        (7, 8): 0.30
+    mastery_bands = {
+        (1, 2): 25,
+        (3, 4): 65,
+        (5, 6): 85,
+        (7, 8): 100
     }
 
-    total_score = 0.0
-    total_weight = 0.0
-
-    for levels, weight in mastery_structure.items():
+    scores = []
+    for levels, weight in mastery_bands.items():
         acc = accuracy_on_levels(answers, levels)
-        if acc is not None:  # Only include levels with attempted questions
-            adjusted = max((acc - 0.25) / 0.75, 0)
-            total_score += weight * adjusted
-            total_weight += weight
+        if acc == 0:
+            count = len([1 for d, _ in answers if d in levels])
+            if count == 0:
+                scores.append(-1)
+                continue
 
-    if total_weight == 0:
-        return 0  # Avoid divide-by-zero if no answers
+        mastery_score = max((acc - 0.25) / 0.75, 0) * weight
+        scores.append(mastery_score)
 
-    return int(round((total_score / total_weight) * 100))
+    # Filter out unattempted (-1) bands
+    attempted_scores = [s for s in scores if s != -1]
 
+    if not attempted_scores:
+        return 0  # Avoid returning max of empty list
+
+    return int(round(max(attempted_scores)))
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
 def render_mastery_bar(score):
