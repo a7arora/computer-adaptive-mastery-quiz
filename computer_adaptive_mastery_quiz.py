@@ -108,28 +108,23 @@ def pick_question(diff, asked, all_qs):
     pool = all_qs.get(diff, [])
     return [(i, q) for i, q in enumerate(pool) if (diff, i) not in asked]
 
-def get_next_question(target_diff, asked, all_qs, going_up=True):
-    # Try target difficulty first
-    candidates = pick_question(target_diff, asked, all_qs)
-    if candidates:
-        return target_diff, *random.choice(candidates)
+def find_next_difficulty(current_diff, going_up, asked, all_qs):
+    next_diff = current_diff + 1 if going_up else current_diff - 1
 
-    # Directional search
-    range_fn = (
-        lambda: range(target_diff + 1, 9) if going_up else range(target_diff - 1, 0, -1)
+    # Try one step in intended direction
+    if 1 <= next_diff <= 8 and pick_question(next_diff, asked, all_qs):
+        return next_diff
+
+    # Try same direction further if first step failed
+    search_range = (
+        range(next_diff + 1, 9) if going_up else range(next_diff - 1, 0, -1)
     )
-    for d in range_fn():
-        candidates = pick_question(d, asked, all_qs)
-        if candidates:
-            return d, *random.choice(candidates)
+    for d in search_range:
+        if pick_question(d, asked, all_qs):
+            return d
 
-    # Final fallback: scan all
-    for d in range(1, 9):
-        candidates = pick_question(d, asked, all_qs)
-        if candidates:
-            return d, *random.choice(candidates)
-
-    return None, None, None
+    # Fallback: stay at current level
+    return current_diff
 
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
