@@ -62,7 +62,7 @@ def call_deepseek_api(prompt):
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
-        "max_tokens": 4500
+        "max_tokens": 2000
     }
     response = requests.post(DEEPSEEK_URL, headers=headers, json=data)
     if response.status_code != 200:
