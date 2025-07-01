@@ -347,7 +347,12 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         if state["current_q"] is None and not state.get("show_explanation", False):
             diff, idx, q = get_next_question(state["current_difficulty"], state["asked"], all_qs)
             if q is None:
-                state["quiz_end"] = True
+                # Check if more questions may still be coming
+                if len(st.session_state.generated_chunks) < len(st.session_state.pdf_chunks):
+                    st.info("More questions are being generated... please wait.")
+                    st.stop()
+                else:
+                    state["quiz_end"] = True
             else:
                 state["current_q"] = q
                 state["current_q_idx"] = idx
