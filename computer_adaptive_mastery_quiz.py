@@ -44,7 +44,7 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
     3. For each incorrect answer, state its letter and text, and **explain why it's wrong**, including what misconception a student might have that could lead them to choose it.
     4. The tone should be that of a **tutor or explainer**, helping a confused student understand both the correct idea and the traps in the wrong ones.
 
-Avoid vague phrases like “According to the passage.” Don’t just repeat the answer. Your goal is to help the student learn the concept by explaining it clearly and thoroughly.
+Avoid vague phrases like “According to the passage.” Don’t just repeat the answer. Your goal is to help the student learn the concept by explaining it clearly and thoroughly. If any question, answer choice, or explanation involves math, format all equations using LaTeX syntax with `$...$` for inline and `$$...$$` for block-level math.
 - "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, or detail recall.
 - "reasoning": A brief rationale explaining why the question fits its percentage correct assignment, considering factors such as complexity, inference required, or detail recall.
 
@@ -315,7 +315,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         idx = state["current_q_idx"]
 
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
-        st.write(q["question"])
+        st.markdown(f"**Question:** {q['question']}", unsafe_allow_html=True)
 
         # Display options as "A. Option text" (no duplicated letter)
         def strip_leading_label(text):
@@ -324,8 +324,9 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         option_labels = ["A", "B", "C", "D"]
         cleaned_options = [strip_leading_label(opt) for opt in q["options"]]
-        options = [f"{label}. {text}" for label, text in zip(option_labels, cleaned_options)]
-        selected = st.radio("Select your answer:", options=options, key=f"radio_{idx}", index=None)
+        for i, (label, text) in enumerate(zip(option_labels, cleaned_options)):
+            st.markdown(f"**{label}.** {text}", unsafe_allow_html=True)
+        selected = st.radio("Select your answer:", option_labels, key=f"radio_{idx}", index=None)
 
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
             # Extract selected letter (before the dot)
@@ -357,9 +358,9 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         if state.get("show_explanation", False):
             if state["last_correct"]:
-                st.success("✅ Correct!")
+                st.markdown("✅ **Correct!**", unsafe_allow_html=True)
             else:
-                st.error(f"❌ Incorrect. {state['last_explanation']}")
+                st.markdown(f"❌ **Incorrect.** {state['last_explanation']}", unsafe_allow_html=True)
 
             if st.button("Next Question"):
                 # Adjust difficulty
