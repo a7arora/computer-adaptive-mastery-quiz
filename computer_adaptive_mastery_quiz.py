@@ -193,6 +193,19 @@ def schedule_next_batch():
     # If next chunk exists and hasn't been generated, do it
     if idx < len(st.session_state.pdf_chunks) and idx not in st.session_state.generated_chunks:
         generate_next_batch()
+def generate_background_batch():
+    next_idx = len(st.session_state.generated_chunks)
+    if next_idx < len(st.session_state.pdf_chunks):
+        if next_idx in st.session_state.generated_chunks:
+            return  # Already done
+        chunk = st.session_state.pdf_chunks[next_idx]
+        prompt = generate_prompt(chunk)
+        response_text, error = call_deepseek_api(prompt)
+        if response_text:
+            parsed = parse_question_json(response_text)
+            st.session_state.all_questions.extend(parsed)
+            st.session_state.questions_by_difficulty = group_by_difficulty(st.session_state.all_questions)
+            st.session_state.generated_chunks.add(next_idx)
 
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
@@ -275,34 +288,36 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 """)
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
-        with st.spinner("Extracting PDF text and setting up quiz..."):
-            chunks = extract_text_from_pdf(uploaded_pdf)
-            if len(chunks) <= 2:
-                grouped_chunks = ["\n\n".join(chunks)]  # Treat as one full chunk
+            with st.spinner("Extracting PDF text and setting up quiz..."):
+                chunks = extract_text_from_pdf(uploaded_pdf)
+                if len(chunks) <= 2:
+                    grouped_chunks = ["\n\n".join(chunks)]
+                else:
+                    grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
+                st.session_state.pdf_chunks = grouped_chunks
+                st.session_state.generated_chunks = set()
+                st.session_state.all_questions = []
+                st.session_state.questions_by_difficulty = {}
+                st.session_state.quiz_ready = False  # Important!
+    
+    # Generate just the first chunk
+            if generate_next_batch():  # Only generates passage 1
+                st.session_state.quiz_state = {
+                    "current_difficulty": 4,
+                    "asked": set(),
+                    "answers": [],
+                    "quiz_end": False,
+                    "current_q_idx": None,
+                    "current_q": None,
+                    "show_explanation": False,
+                    "last_correct": None,
+                    "last_explanation": None,
+                }
+                st.session_state.quiz_ready = True
+                st.success("✅ Questions generated! Starting the quiz...")
+                st.rerun()
             else:
-                grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
-            st.session_state.pdf_chunks = grouped_chunks
-            st.session_state.generated_chunks = set()
-            st.session_state.all_questions = []
-            st.session_state.questions_by_difficulty = {}
-        # Generate FIRST BATCH ONLY
-        if generate_next_batch():
-            st.session_state.quiz_state = {
-                "current_difficulty": 4,
-                "asked": set(),
-                "answers": [],
-                "quiz_end": False,
-                "current_q_idx": None,
-                "current_q": None,
-                "show_explanation": False,
-                "last_correct": None,
-                "last_explanation": None,
-            }
-            st.session_state.quiz_ready = True
-            st.success("✅ Questions generated! Starting the quiz...")
-            st.rerun()
-        else:
-            st.error("No questions were generated.")
+                st.error("Failed to generate initial questions.")
 
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
@@ -313,6 +328,8 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         st.stop()
     score = compute_mastery_score(state.get("answers", []))
     render_mastery_bar(score)
+    with st.empty():  # Keeps it hidden from the user
+        generate_background_batch()
 
     # ===== SCHEDULE/BACKGROUND next batch generation =====
     schedule_next_batch()
