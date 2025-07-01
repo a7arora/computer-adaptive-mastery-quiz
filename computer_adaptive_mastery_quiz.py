@@ -162,6 +162,59 @@ def compute_mastery_score(answers):
         return 0
 
     return int(round(max(band_scores)))
+def render_mastery_bar(score):
+    if score < 30:
+        color = "red"
+        text_color = "white"
+    elif score < 70:
+        color = "yellow"
+        text_color = "black"
+    else:
+        color = "green"
+        text_color = "white"
+
+    st.markdown(f"""
+    <style>
+        .mastery-bar-wrapper {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 9999;
+            background-color: white;
+            padding: 8px 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }}
+        .mastery-bar {{
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 24px;
+            width: 100%;
+            background-color: #eee;
+        }}
+        .mastery-bar-fill {{
+            height: 100%;
+            width: {score}%;
+            background-color: {color};
+            text-align: center;
+            color: {text_color};
+            font-weight: bold;
+            line-height: 24px;
+        }}
+        .spacer {{
+            height: 60px;
+        }}
+    </style>
+
+    <div class="mastery-bar-wrapper">
+        <div class="mastery-bar">
+            <div class="mastery-bar-fill">{score}%</div>
+        </div>
+    </div>
+    <div class="spacer"></div>
+    """, unsafe_allow_html=True)
+
 
 # === SILENT BACKGROUND CHUNK LOADING ===
 def load_next_chunk_in_background():
@@ -378,55 +431,3 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             st.rerun()
 
 # === Mastery bar render function from your code ===
-def render_mastery_bar(score):
-    if score < 30:
-        color = "red"
-        text_color = "white"
-    elif score < 70:
-        color = "yellow"
-        text_color = "black"
-    else:
-        color = "green"
-        text_color = "white"
-
-    st.markdown(f"""
-    <style>
-        .mastery-bar-wrapper {{
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 9999;
-            background-color: white;
-            padding: 8px 16px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        }}
-        .mastery-bar {{
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            overflow: hidden;
-            height: 24px;
-            width: 100%;
-            background-color: #eee;
-        }}
-        .mastery-bar-fill {{
-            height: 100%;
-            width: {score}%;
-            background-color: {color};
-            text-align: center;
-            color: {text_color};
-            font-weight: bold;
-            line-height: 24px;
-        }}
-        .spacer {{
-            height: 60px;
-        }}
-    </style>
-
-    <div class="mastery-bar-wrapper">
-        <div class="mastery-bar">
-            <div class="mastery-bar-fill">{score}%</div>
-        </div>
-    </div>
-    <div class="spacer"></div>
-    """, unsafe_allow_html=True)
