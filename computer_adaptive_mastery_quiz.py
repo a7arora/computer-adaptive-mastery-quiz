@@ -26,10 +26,10 @@ def generate_prompt(text_chunk):
     return f"""
 You are an educational assistant helping teachers generate multiple choice questions from a passage.
 
-Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If the passage is too short to reasonably support 20 distinct questions, generate as many high-quality questions as possible (minimum of 5), ensuring they reflect varying difficulty.
+Given the following passage or notes, generate exactly 8 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 8 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If the passage is too short to reasonably support 8 distinct questions, generate as many high-quality questions as possible (minimum of 4), ensuring they reflect varying difficulty.
 
 **Requirements**:
-- 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard(<40%)
+- 2 easy (≥85%), 2 medium (60–84%), 2 medium-hard (40-60%), 2 hard(<40%)
 
 **Each question must include the following fields:**
 
@@ -45,10 +45,9 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
     4. The tone should be that of a **tutor or explainer**, helping a confused student understand both the correct idea and the traps in the wrong ones.
 
 Avoid vague phrases like “According to the passage.” Don’t just repeat the answer. Your goal is to help the student learn the concept by explaining it clearly and thoroughly. If any question, answer choice, or explanation involves math, format all equations using LaTeX syntax with `$...$` for inline and `$$...$$` for block-level math.
-- "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, or detail recall.
-- "reasoning": A brief rationale explaining why the question fits its percentage correct assignment, considering factors such as complexity, inference required, or detail recall.
+- "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, or detail recall. Make sure that this estimate is grounded in evidence-based facts as to the skills that this question tests and the way that the question tests them. 
 
-Return a valid JSON list of up to 20 questions. If there is insufficient content, generate as many high-quality questions as possible (minimum 5).
+Return a valid JSON list of up to 8 questions. If there is insufficient content, generate as many high-quality questions as possible (minimum 4).
 
 Passage:
 {text_chunk}
@@ -251,26 +250,25 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
-        with st.spinner("Generating questions..."):
+        with st.spinner("Generating initial questions..."):
             chunks = extract_text_from_pdf(uploaded_pdf)
-            # Adaptive chunking
-            if len(chunks) <= 2:
-                grouped_chunks = ["\n\n".join(chunks)]  # Treat as one full chunk
-            else:
-                grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
+            grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
+        
+            st.session_state.chunk_queue = grouped_chunks
+            st.session_state.generated_chunks = 0
+            st.session_state.scheduled_chunks = 5  # initial + 4 later
 
             all_questions = []
-            # Pick first 2 chunks or duplicate the first if only one exists
-            chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
 
-            for chunk in chunks_to_use:
-                prompt = generate_prompt(chunk)
-                response_text, error = call_deepseek_api(prompt)
-                if error:
-                    st.error("API error: " + error)
-                    continue
+            # Generate first chunk only
+            initial_chunk = grouped_chunks[0]
+            prompt = generate_prompt(initial_chunk)
+            response_text, error = call_deepseek_api(prompt)
+            if not error:
                 parsed = parse_question_json(response_text)
                 all_questions.extend(parsed)
+                st.session_state.generated_chunks = 1
+
             if all_questions:
                 st.session_state.all_questions = all_questions
                 st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
@@ -291,6 +289,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
             else:
                 st.error("No questions were generated.")
 
+
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
     state = st.session_state.get("quiz_state", None)
@@ -298,6 +297,21 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     if state is None:
         st.warning("Quiz state not found. Please restart the app or re-upload a PDF.")
         st.stop()
+        # Automatically queue up more batches if fewer than 5 loaded
+    if (
+        "chunk_queue" in st.session_state
+        and st.session_state.generated_chunks < st.session_state.scheduled_chunks
+        and len(st.session_state.chunk_queue) > st.session_state.generated_chunks
+    ):
+        with st.spinner("Loading more questions in the background..."):
+            next_chunk = st.session_state.chunk_queue[st.session_state.generated_chunks]
+            prompt = generate_prompt(next_chunk)
+            response_text, error = call_deepseek_api(prompt)
+            if not error:
+                new_qs = parse_question_json(response_text)
+                st.session_state.all_questions.extend(new_qs)
+                st.session_state.questions_by_difficulty = group_by_difficulty(st.session_state.all_questions)
+                st.session_state.generated_chunks += 1
     score = compute_mastery_score(state.get("answers", []))
     render_mastery_bar(score)
     if not state["quiz_end"]:
