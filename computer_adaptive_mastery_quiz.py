@@ -285,6 +285,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 }
                 st.success("✅ Questions generated! Starting the quiz...")
                 st.session_state.quiz_ready = True
+                st.session_state.quiz_state["first_question_displayed"] = False
                 st.rerun()
             else:
                 st.error("No questions were generated.")
@@ -302,6 +303,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         "chunk_queue" in st.session_state
         and st.session_state.generated_chunks < st.session_state.scheduled_chunks
         and len(st.session_state.chunk_queue) > st.session_state.generated_chunks
+        and state.get("first_question_displayed", False)  # ⬅ only load more once quiz is shown
     ):
         with st.spinner("Loading more questions in the background..."):
             next_chunk = st.session_state.chunk_queue[st.session_state.generated_chunks]
@@ -330,6 +332,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
         st.markdown(f"**Question:** {q['question']}", unsafe_allow_html=True)
+        state["first_question_displayed"] = True
 
         # Display options as "A. Option text" (no duplicated letter)
         def strip_leading_label(text):
