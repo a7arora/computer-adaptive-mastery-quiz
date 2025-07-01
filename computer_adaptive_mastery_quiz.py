@@ -240,11 +240,11 @@ Each question includes:
 - An explanation
 - A predicted correctness percentage
 
-Unlike static tools like Khanmigo, this app uses generative AI to dynamically create the quiz from **your own content** — no rigid question banks required.
+Unlike static tools like Khanmigo, this app uses generative AI to dynamically create the quiz from **your own content** — no rigid question banks required. 
 
 ---
 
-**Built using the DeepSeek-R1-0528 model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience.
+**Built using the DeepSeek-R1-0528 model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. Please keep in mind that it currently takes about 3-4 minutes to generate questions from a pdf. Furthermore, it only accepts text output and cannot read handwriting or drawings at this time. 
 
 ---
 """)
