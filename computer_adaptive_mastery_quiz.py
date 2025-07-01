@@ -313,11 +313,18 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                     "last_correct": None,
                     "last_explanation": None,
                 }
+                # PRELOAD THE FIRST QUESTION
+                all_qs = st.session_state.questions_by_difficulty
+                diff, idx, q = get_next_question(4, set(), all_qs)
+                if q:
+                    st.session_state.quiz_state["current_difficulty"] = diff
+                    st.session_state.quiz_state["current_q_idx"] = idx
+                    st.session_state.quiz_state["current_q"] = q
+
                 st.session_state.quiz_ready = True
                 st.success("✅ Questions generated! Starting the quiz...")
                 st.rerun()
-            else:
-                st.error("Failed to generate initial questions.")
+
 
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
