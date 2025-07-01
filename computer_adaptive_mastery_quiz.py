@@ -332,12 +332,26 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         if state["current_q"] is None and not state.get("show_explanation", False):
             diff, idx, q = get_next_question(state["current_difficulty"], state["asked"], all_qs)
+
             if q is None:
+            # Try to find another difficulty level with questions
+                alt_diff = find_next_difficulty(state["current_difficulty"], going_up=True, asked=state["asked"], all_qs=all_qs)
+                if alt_diff != state["current_difficulty"]:
+                    state["current_difficulty"] = alt_diff
+                    diff, idx, q = get_next_question(alt_diff, state["asked"], all_qs)
+
+            if q is None:
+                # Still no questions found — end the quiz
                 state["quiz_end"] = True
+                state["current_q"] = None
+                state["current_q_idx"] = None
+                st.rerun()
             else:
+                # Found a question to continue
                 state["current_q"] = q
                 state["current_q_idx"] = idx
                 state["current_difficulty"] = diff
+
 
         if not state["quiz_end"] and state["current_q"]:
 
