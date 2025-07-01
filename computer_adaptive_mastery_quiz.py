@@ -285,7 +285,6 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 }
                 st.success("✅ Questions generated! Starting the quiz...")
                 st.session_state.quiz_ready = True
-                st.rerun()
             else:
                 st.error("No questions were generated.")
 
