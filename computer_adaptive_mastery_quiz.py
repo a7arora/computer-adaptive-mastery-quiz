@@ -143,25 +143,31 @@ def compute_mastery_score(answers):
         (7, 8): 100
     }
 
-    scores = []
+    min_attempts_required = 3  # Threshold for full credit
+    band_scores = []
+
     for levels, weight in mastery_bands.items():
-        acc = accuracy_on_levels(answers, levels)
-        if acc == 0:
-            count = len([1 for d, _ in answers if d in levels])
-            if count == 0:
-                scores.append(-1)
-                continue
+        relevant = [correct for d, correct in answers if d in levels]
+        attempts = len(relevant)
 
-        mastery_score = max((acc - 0.25) / 0.75, 0) * weight
-        scores.append(mastery_score)
+        if attempts == 0:
+            continue  # No data at this band
 
-    # Filter out unattempted (-1) bands
-    attempted_scores = [s for s in scores if s != -1]
+        acc = sum(relevant) / attempts
+        normalized_score = max((acc - 0.25) / 0.75, 0)  # Normalize accuracy
 
-    if not attempted_scores:
-        return 0  # Avoid returning max of empty list
+        if attempts < min_attempts_required:
+            # Partial credit based on how close we are to the threshold
+            scaled_score = normalized_score * weight * (attempts / min_attempts_required)
+            band_scores.append(scaled_score)
+        else:
+            band_score = normalized_score * weight
+            band_scores.append(band_score)
 
-    return int(round(max(attempted_scores)))
+    if not band_scores:
+        return 0  # No band has any attempts
+
+    return int(round(max(band_scores)))
 # === STREAMLIT APP ===
 st.title("AscendQuiz")
 def render_mastery_bar(score):
