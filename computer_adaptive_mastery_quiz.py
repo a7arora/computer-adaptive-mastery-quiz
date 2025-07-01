@@ -176,7 +176,7 @@ def generate_next_batch():
     if idx < len(st.session_state.pdf_chunks):
         chunk = st.session_state.pdf_chunks[idx]
         prompt = generate_prompt(chunk)
-        with st.spinner(f"Generating questions from passage {idx+1}..."):
+        with st.spinner(f"Generating questions. Be patient!..."):
             response_text, error = call_deepseek_api(prompt)
         if error:
             st.error("API error: " + str(error))
