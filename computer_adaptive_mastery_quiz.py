@@ -43,6 +43,7 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
        - Use step-by-step reasoning, examples, or analogies when helpful.
     3. For each incorrect answer, state its letter and text, and **explain why it's wrong**, including what misconception a student might have that could lead them to choose it.
     4. The tone should be that of a **tutor or explainer**, helping a confused student understand both the correct idea and the traps in the wrong ones.
+- "cognitive_level": The Bloom's Taxonomy level required to answer the question correctly. Choose from: "Remember", "Understand", "Apply", "Analyze", "Evaluate", or "Create". Think deeply about which cognitive skill is actually tested.
 
 Avoid vague phrases like “According to the passage.” Don’t just repeat the answer. Your goal is to help the student learn the concept by explaining it clearly and thoroughly.
 - "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, or detail recall.
@@ -79,6 +80,38 @@ def parse_question_json(text):
         return json.loads(clean_response_text(text))
     except Exception:
         return []
+
+def filter_invalid_difficulty_alignment(questions):
+    bloom_difficulty_ranges = {
+        "Remember": (85, 100),
+        "Understand": (70, 90),
+        "Apply": (60, 80),
+        "Analyze": (40, 70),
+        "Evaluate": (30, 60),
+        "Create": (20, 50)
+    }
+
+    valid = []
+    invalid = []
+
+    for q in questions:
+        cog = q.get("cognitive_level", "").strip().capitalize()
+        try:
+            pct = int(q.get("estimated_correct_pct", -1))
+        except:
+            pct = -1
+
+        if cog in bloom_difficulty_ranges and 0 <= pct <= 100:
+            low, high = bloom_difficulty_ranges[cog]
+            if low <= pct <= high:
+                valid.append(q)
+            else:
+                invalid.append(q)
+        else:
+            invalid.append(q)
+
+    return valid, invalid
+
 
 def assign_difficulty_label(estimated_pct):
     try:
@@ -270,7 +303,11 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                     st.error("API error: " + error)
                     continue
                 parsed = parse_question_json(response_text)
-                all_questions.extend(parsed)
+                valid, invalid = filter_invalid_difficulty_alignment(parsed)
+                all_questions.extend(valid)
+                if "filtered_questions" not in st.session_state:
+                    st.session_state.filtered_questions = []
+                st.session_state.filtered_questions.extend(invalid)
             if all_questions:
                 st.session_state.all_questions = all_questions
                 st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
