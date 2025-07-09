@@ -83,11 +83,11 @@ def parse_question_json(text):
 
 def filter_invalid_difficulty_alignment(questions):
     bloom_difficulty_ranges = {
-        "Remember": (85, 100),
-        "Understand": (70, 90),
-        "Apply": (60, 80),
-        "Analyze": (40, 70),
-        "Evaluate": (30, 60),
+        "Remember": (70, 100),
+        "Understand": (60, 90),
+        "Apply": (55, 85),
+        "Analyze": (35, 70),
+        "Evaluate": (20, 65),
         "Create": (20, 50)
     }
 
