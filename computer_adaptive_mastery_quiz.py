@@ -24,7 +24,7 @@ def extract_text_from_pdf(pdf_file):
 
 def generate_prompt(text_chunk):
     return f"""
-You are an educational assistant helping teachers generate multiple choice questions from a passage.
+You are a teacher who is designing a test with multiple choiced questions(each with 4 answer choices) to test content from a passage.
 
 Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If the passage is too short to reasonably support 20 distinct questions, generate as many high-quality questions as possible (minimum of 5), ensuring they reflect varying difficulty.
 
@@ -434,6 +434,32 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             st.success("🎉 You have mastered the content, achieving 75%+ accuracy on hard questions. Great job!")
         else:
             st.warning("Mastery was not achieved. Please review the material and try again.")
+        if "all_questions" in st.session_state:
+            all_qs_json = json.dumps(st.session_state.all_questions, indent=2)
+            st.download_button(
+                label="📥 Download All Quiz Questions (JSON)",
+                data=all_qs_json,
+                file_name="ascendquiz_questions.json",
+                mime="application/json"
+            )
+            if "filtered_questions" in st.session_state:
+                filtered_json = json.dumps(st.session_state.filtered_questions, indent=2)
+                st.download_button(
+                    label="🐞 Download Invalid Questions (JSON)",
+                    data=filtered_json,
+                    file_name="filtered_questions.json",
+                    mime="application/json"
+                    )
+
+    if "filtered_questions" in st.session_state:
+        filtered_json = json.dumps(st.session_state.filtered_questions, indent=2)
+
+        st.download_button(
+            label="🐞 Download Invalid Questions (JSON)",
+            data=filtered_json,
+            file_name="filtered_questions.json",
+            mime="application/json"
+        )
 
         if st.button("Restart Quiz"):
             del st.session_state.all_questions
