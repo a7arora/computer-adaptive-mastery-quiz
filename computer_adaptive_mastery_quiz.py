@@ -454,28 +454,3 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
-            if "filtered_questions" in st.session_state:
-                filtered_json = json.dumps(st.session_state.filtered_questions, indent=2)
-                st.download_button(
-                    label="🐞 Download Invalid Questions (JSON)",
-                    data=filtered_json,
-                    file_name="filtered_questions.json",
-                    mime="application/json"
-                    )
-
-    if "filtered_questions" in st.session_state:
-        filtered_json = json.dumps(st.session_state.filtered_questions, indent=2)
-
-        st.download_button(
-            label="🐞 Download Invalid Questions (JSON)",
-            data=filtered_json,
-            file_name="filtered_questions.json",
-            mime="application/json"
-        )
-
-        if st.button("Restart Quiz"):
-            del st.session_state.all_questions
-            del st.session_state.questions_by_difficulty
-            del st.session_state.quiz_state
-            del st.session_state.quiz_ready
-            st.rerun()
