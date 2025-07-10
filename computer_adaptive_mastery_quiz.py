@@ -28,6 +28,7 @@ You are a teacher who is designing a test with multiple choiced questions(each w
 
 Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If the passage is too short to reasonably support 20 distinct questions, generate as many high-quality questions as possible (minimum of 5), ensuring they reflect varying difficulty.
 
+
 **Requirements**:
 - 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard(<40%)
 
@@ -49,6 +50,7 @@ Avoid vague phrases like “According to the passage.” Don’t just repeat the
 - "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, or detail recall.
 - "reasoning": A brief rationale explaining why the question fits its percentage correct assignment, considering factors such as complexity, inference required, or detail recall.
 
+All math expressions, formulas, variables, and symbols in the questions, answer choices, and explanations must be written in valid LaTeX format using $...$ for inline math and $$...$$ for display math when appropriate. This ensures proper rendering in LaTeX-supported environments.
 Return a valid JSON list of up to 20 questions. If there is insufficient content, generate as many high-quality questions as possible (minimum 5).
 
 Passage:
@@ -352,7 +354,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         idx = state["current_q_idx"]
 
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
-        st.write(q["question"])
+        st.markdown(q["question"], unsafe_allow_html=True)
 
         # Display options as "A. Option text" (no duplicated letter)
         def strip_leading_label(text):
@@ -361,8 +363,17 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         option_labels = ["A", "B", "C", "D"]
         cleaned_options = [strip_leading_label(opt) for opt in q["options"]]
-        options = [f"{label}. {text}" for label, text in zip(option_labels, cleaned_options)]
-        selected = st.radio("Select your answer:", options=options, key=f"radio_{idx}", index=None)
+        rendered_options = []
+        for label, text in zip(option_labels, cleaned_options):
+            # Wrap LaTeX content in markdown with inline math if any '$' is present
+            if "$" in text or "\\" in text:
+                rendered_text = f"{label}. $${text}$$"
+            else:
+                rendered_text = f"{label}. {text}"
+            rendered_options.append(rendered_text)
+
+        selected = st.radio("Select your answer:", options=rendered_options, key=f"radio_{idx}", index=None)
+
 
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
             # Extract selected letter (before the dot)
@@ -396,7 +407,8 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             if state["last_correct"]:
                 st.success("✅ Correct!")
             else:
-                st.error(f"❌ Incorrect. {state['last_explanation']}")
+                st.markdown("❌ **Incorrect.**", unsafe_allow_html=True)
+                st.markdown(state["last_explanation"], unsafe_allow_html=True)
 
             if st.button("Next Question"):
                 # Adjust difficulty
