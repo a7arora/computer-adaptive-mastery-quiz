@@ -267,7 +267,7 @@ Welcome to your personalized learning assistant — an AI-powered tool that tran
 **How it works:**
 This app uses a large language model (LLM) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
 
-The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once you reach a mastery score of 70 or higher(calculated using the accuracy weighted by difficulty level) the system considers you to have achieved **mastery** and ends the quiz.
+The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once your **mastery score reaches 70% or higher** (calculated using your accuracy weighted by difficulty level), the system considers you to have achieved **mastery** and ends the quiz.
 
 Each question includes:
 - Four answer options
@@ -283,6 +283,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
 ---
 """)
+
 
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
