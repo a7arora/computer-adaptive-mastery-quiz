@@ -6,8 +6,7 @@ import json
 import re
 import random
 
-# === CONFIGURATION ===
-# Get the API key securely from Streamlit secrets
+
 API_KEY = st.secrets["DEEPSEEK_API_KEY"]
 
 headers = {
@@ -15,9 +14,8 @@ headers = {
     "Content-Type": "application/json"
 }
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
-MODEL_NAME = "deepseek-chat"  # or another supported model name
+MODEL_NAME = "deepseek-chat"  
 
-# === FUNCTION DEFINITIONS ===
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
     return [page.get_text() for page in doc if page.get_text().strip()]
@@ -149,16 +147,12 @@ def find_next_difficulty(current_diff, going_up, asked, all_qs):
     # Try one step in intended direction
     if 1 <= next_diff <= 8 and pick_question(next_diff, asked, all_qs):
         return next_diff
-
-    # Try same direction further if first step failed
     search_range = (
         range(next_diff + 1, 9) if going_up else range(next_diff - 1, 0, -1)
     )
     for d in search_range:
         if pick_question(d, asked, all_qs):
             return d
-
-    # Fallback: stay at current level
     return current_diff
 def get_next_question(current_diff, asked, all_qs):
     available = pick_question(current_diff, asked, all_qs)
@@ -171,6 +165,7 @@ def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
 def compute_mastery_score(answers):
+    #limits mastery scores based on difficulty attempted
     mastery_bands = {
         (1, 2): 25,
         (3, 4): 65,
@@ -178,7 +173,7 @@ def compute_mastery_score(answers):
         (7, 8): 100
     }
 
-    min_attempts_required = 3  # Threshold for full credit
+    min_attempts_required = 3 
     band_scores = []
 
     for levels, weight in mastery_bands.items():
@@ -186,13 +181,12 @@ def compute_mastery_score(answers):
         attempts = len(relevant)
 
         if attempts == 0:
-            continue  # No data at this band
-
+            continue  
+        #does not give mastery points for guessing, especially on hard questions
         acc = sum(relevant) / attempts
-        normalized_score = max((acc - 0.25) / 0.75, 0)  # Normalize accuracy
+        normalized_score = max((acc - 0.25) / 0.75, 0) 
 
         if attempts < min_attempts_required:
-            # Partial credit based on how close we are to the threshold
             scaled_score = normalized_score * weight * (attempts / min_attempts_required)
             band_scores.append(scaled_score)
         else:
@@ -200,10 +194,11 @@ def compute_mastery_score(answers):
             band_scores.append(band_score)
 
     if not band_scores:
-        return 0  # No band has any attempts
+        return 0  
 
     return int(round(max(band_scores)))
-# === STREAMLIT APP ===
+
+#app frontend
 st.title("AscendQuiz")
 def render_mastery_bar(score):
     if score < 30:
@@ -356,8 +351,6 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
         st.markdown(q["question"], unsafe_allow_html=True)
-
-        # Display options as "A. Option text" (no duplicated letter)
         def strip_leading_label(text):
             # Removes A), A., A:, A - etc.
             return re.sub(r"^[A-Da-d][\).:\-]?\s+", "", text).strip()
@@ -377,10 +370,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
 
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
-            # Extract selected letter (before the dot)
             selected_letter = selected.split(".")[0].strip().upper()
-
-            # Map correct_answer letter to index
             letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
             correct_letter = q["correct_answer"].strip().upper()
             correct_index = letter_to_index.get(correct_letter, None)
@@ -399,8 +389,9 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             state["last_explanation"] = q["explanation"]
             state["show_explanation"] = True
 
-            # Check mastery
+            # Update mastery score according to quiz question
             score = compute_mastery_score(state["answers"])
+            #end when students reach mastery at 70/100
             if score >= 70:
                 state["quiz_end"] = True
 
@@ -420,7 +411,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                             return d
                     return current_diff  # fallback to current if no higher/lower available
 
-                # Adjust difficulty based on performance
+                # Adjust difficulty based on performance, scaffolding learning and challenging students
                 if state["last_correct"]:
                     state["current_difficulty"] = find_next_difficulty(
                     state["current_difficulty"], going_up=True, asked=state["asked"], all_qs=all_qs
