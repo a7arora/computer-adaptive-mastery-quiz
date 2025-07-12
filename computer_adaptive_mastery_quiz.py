@@ -26,7 +26,7 @@ def generate_prompt(text_chunk):
     return f"""
 You are a teacher who is designing a test with multiple choiced questions(each with 4 answer choices) to test content from a passage.
 
-Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If the passage is too short to reasonably support 20 distinct questions, generate as many high-quality questions as possible (minimum of 5), ensuring they reflect varying difficulty. Please make sure that the question is something that relates to the 
+Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If the passage is too short to reasonably support 20 distinct questions, generate as many high-quality questions as possible (minimum of 5), ensuring they reflect varying difficulty. Please make sure that the question is something that relates to the material in the passage or an application/extension of it.
 
 
 **Requirements**:
