@@ -26,7 +26,7 @@ def generate_prompt(text_chunk):
     return f"""
 You are a teacher who is designing a test with multiple choiced questions(each with 4 answer choices) to test content from a passage.
 
-Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. If the passage is too short to reasonably support 20 distinct questions, generate as many high-quality questions as possible (minimum of 5), ensuring they reflect varying difficulty. You can repeat the same questions if there is very little content, even though this is not preferred. Please make sure that the question is something that relates to the material in the passage or an application/extension of it.
+Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. You can repeat the same questions if there is very little content, even though this is not preferred, so that there are 20 total questions. Please make sure that the question is something that relates to the material in the passage or an application/extension of it. Please do not use specialized vocabulary that is not explicitly stated in the passage without definition.(such as mentioning photosynthesis when a passage only talks about flowers- in that case please define pollination before asking a question about pollination)
 
 
 **Requirements**:
@@ -36,7 +36,7 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
 
 - "question": A clear, concise, and unambiguous question directly related or an application of content from the passage that aligns with key learning objectives. The question should be designed to test understanding of material covered in the passage and should be made so it could show up on an educational assessment testing material from this passage. The question should be cognitively appropriate for the specified difficulty level, encouraging critical thinking, application, analysis, or synthesis rather than rote recall if not at the easiest difficulty level. Please make the question at a slightly higher difficulty than you would expect a question of this difficulty to be at(i.e. creating a medium hard question when a medium question is requested). Avoid overly complex wording or ambiguity to ensure students understand exactly what is being asked. Furthermore, make sure that the question has all the context in itself and does not reference specific figures or pages in the passage, as the question is designed for the user to do independently without the passage, even though it test knowledge of content fron the passage.
 - "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D"(with one of them being the correct answer). If the question is of medium or hard difficulty, please come up with wrong answers that are ones that a user who does not know the concept well or makes an error would select. Please make sure that only one answer choice is correct by solving the problem and checking all of the answer choices carefully and thoroughly. It should not be ambigiuous which as to whether an answer choice is correct or not.
-- "correct_answer": The letter ("A", "B", "C", or "D") corresponding to the correct option.
+- "correct_answer": The letter ("A", "B", "C", or "D") corresponding to the correct option. Please make sure that this answer is correct and is clearly the only correct answer.
 - "explanation": A deep, pedagogically useful explanation that **teaches the concept** behind the correct answer and analyzes the flaws in the others. The explanation must:
     1. Start by stating the correct letter and full answer.
     2. Teach **why** that answer is correct using **conceptual reasoning** — including how the mechanism works, or why the property matters — not just restating facts.
@@ -47,11 +47,11 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
 - "cognitive_level": The Bloom's Taxonomy level required to answer the question correctly. Choose from: "Remember", "Understand", "Apply", "Analyze", "Evaluate", or "Create". Think deeply about which cognitive skill is actually tested.
 
 Avoid vague phrases like “According to the passage.” Don’t just repeat the answer. Your goal is to help the student learn the concept by explaining it clearly and thoroughly.
-- "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, inference required, distractors, and detail recall. Put yourself in the shoes of a student who is taking a quiz or test based on this unit, and consider how likely a student is to pick both the correct and incorrect answer, simulating the students thinking process. You tend to think a question is harder than expected(putting into a lower percentage correct category), so please evaluate the question thoroughly and based on real evidence from student abilities on similar topics/questions if possible.
+- "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, question context, inference required, distractors, and detail recall. Put yourself in the shoes of a student who is taking a quiz or test based on this unit, and consider how likely a student is to pick both the correct and incorrect answer, simulating the students thinking process. You tend to think a question is harder than expected(putting into a lower percentage correct category), so please evaluate the question thoroughly and based on real evidence from student abilities on similar topics/questions if possible.
 - "reasoning": A brief rationale explaining why the question fits its percentage correct assignment, considering factors such as complexity, inference required, answer  or detail recall.
 
 All math expressions, formulas, variables, and symbols in the questions, answer choices, and explanations must be written in valid LaTeX format using $...$ for inline math and $$...$$ for display math when appropriate. This ensures proper rendering in LaTeX-supported environments.
-Return a valid JSON list of up to 20 questions. If there is insufficient content, generate as many high-quality questions as possible. 
+Return a valid JSON list of 20 questions. If there is insufficient content, as previously stated, duplicate existing questions to create a total of 20 questions at the appropriate difficulty levels 
 
 Passage:
 {text_chunk}
@@ -267,7 +267,7 @@ Welcome to your personalized learning assistant — an AI-powered tool that tran
 **How it works:**
 This app uses a large language model (LLM) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
 
-The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once you get 5 hard questions (difficulty level 6 or above) correct at a 75%+ rate, the system considers you to have achieved **mastery** and ends the quiz.
+The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once you reach a mastery score of 70 or higher(calculated using the accuracy weighted by difficulty level) the system considers you to have achieved **mastery** and ends the quiz.
 
 Each question includes:
 - Four answer options
@@ -440,8 +440,6 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         acc = accuracy_on_levels(state["answers"], [5, 6, 7, 8])
         hard_attempts = len([1 for d, _ in state["answers"] if d >= 5])
         st.markdown("## Quiz Completed 🎉")
-        st.markdown(f"Accuracy on hard questions: {acc:.0%} ({hard_attempts} hard questions attempted)")
-
         if score >= 70:
             st.success(f"🎉 You have mastered the content! Your mastery score is {score}%. Great job!")
         else:
