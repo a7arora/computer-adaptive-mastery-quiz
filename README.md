@@ -1,4 +1,4 @@
-🌟 Ascend Quiz: AI-Powered Computer-Adaptive Mastery-Based Quizzing from Any PDF
+Ascend Quiz: AI-Powered Computer-Adaptive Mastery-Based Quizzing from Any PDF
 
 Ascend Quiz is a fully functional Streamlit web app that automatically generates personalized, mastery-driven quizzes from any uploaded PDF (lecture notes, textbook excerpts, etc). Built with Deepseek's R1-0528 API, the app uses generative AI to create high-quality, curriculum-agnostic assessments with adaptive difficulty and real-time feedback.
 
