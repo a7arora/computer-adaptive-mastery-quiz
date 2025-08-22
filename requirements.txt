@@ -2,3 +2,4 @@ streamlit
 requests
 PyMuPDF
 pandas
+json5
