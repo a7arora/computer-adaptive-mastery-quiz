@@ -95,10 +95,14 @@ def filter_invalid_difficulty_alignment(questions):
     invalid = []
 
     for q in questions:
-        cog = q.get("cognitive_level", "").strip().capitalize()
+        if not isinstance(q, dict):  # skip anything not a dict
+            invalid.append(q)
+            continue
+
+        cog = str(q.get("cognitive_level", "")).strip().capitalize()
         try:
             pct = int(q.get("estimated_correct_pct", -1))
-        except:
+        except Exception:
             pct = -1
 
         if cog in bloom_difficulty_ranges and 0 <= pct <= 100:
@@ -111,7 +115,6 @@ def filter_invalid_difficulty_alignment(questions):
             invalid.append(q)
 
     return valid, invalid
-
 
 def assign_difficulty_label(estimated_pct):
     try:
@@ -445,3 +448,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
