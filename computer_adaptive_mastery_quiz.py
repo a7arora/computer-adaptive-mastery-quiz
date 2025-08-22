@@ -97,12 +97,20 @@ def clean_response_text(text: str) -> str:
 
     return text
 
+def fix_common_json_issues(text: str) -> str:
+    # Remove trailing commas before closing braces/brackets
+    text = re.sub(r",\s*([\]}])", r"\1", text)
+    # Ensure objects are comma-separated
+    text = re.sub(r"}\s*{", r"}, {", text)
+    return text
+
 def parse_question_json(text: str):
     """
     Attempts to parse DeepSeek output into JSON.
     Tries multiple fallback strategies and logs failures for debugging.
     """
     cleaned = clean_response_text(text)
+    cleaned = fix_common_json_issues(cleaned)
 
     try:
         return json.loads(cleaned)
@@ -495,6 +503,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
