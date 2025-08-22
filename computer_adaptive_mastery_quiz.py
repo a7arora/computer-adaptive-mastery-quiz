@@ -80,58 +80,132 @@ def clean_response_text(text: str) -> str:
     """
     text = text.strip()
 
-    # Remove ```json ... ``` fences
-    fence_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-    if fence_match:
-        text = fence_match.group(1).strip()
+    # Remove ```json ... ``` fences (more flexible pattern)
+    fence_patterns = [
+        r"```json\s*(.*?)```",  # ```json content ```
+        r"```\s*(.*?)```",      # ``` content ```
+        r"`{3,}\s*json\s*(.*?)`{3,}",  # Multiple backticks with json
+        r"`{3,}\s*(.*?)`{3,}"   # Multiple backticks without json
+    ]
+    
+    for pattern in fence_patterns:
+        fence_match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+        if fence_match:
+            text = fence_match.group(1).strip()
+            break
 
-    # Truncate at the last closing square bracket ] if it exists
-    if "[" in text and "]" in text:
-        text = text[: text.rfind("]") + 1]
+    # Find the JSON array boundaries
+    # Look for the first '[' and last ']'
+    start_idx = text.find('[')
+    end_idx = text.rfind(']')
+    
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        text = text[start_idx:end_idx + 1]
         return text.strip()
 
-    # Otherwise, truncate at the last closing curly brace }
-    if "{" in text and "}" in text:
-        text = text[: text.rfind("}") + 1]
+    # Fallback: look for object boundaries
+    start_idx = text.find('{')
+    end_idx = text.rfind('}')
+    
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        text = text[start_idx:end_idx + 1]
         return text.strip()
 
     return text
 
 
 def repair_json(text: str) -> str:
+    """
+    Repairs common JSON formatting issues
+    """
     # Remove trailing commas before ] or }
-    text = re.sub(r",\s*([\]}])", r"\1", text)
+    text = re.sub(r',\s*([\]}])', r'\1', text)
 
     # Fix }{ into }, {
-    text = re.sub(r"}\s*{", r"}, {", text)
+    text = re.sub(r'}\s*{', r'}, {', text)
 
     # Fix ] [ into ], [
-    text = re.sub(r"]\s*\[", r"], [", text)
+    text = re.sub(r']\s*\[', r'], [', text)
 
     # Replace percent signs in numbers (e.g. 92% -> 92)
     text = re.sub(r'(\d+)\s*%', r'\1', text)
 
-    # Escape unescaped quotes inside explanations
-    text = re.sub(r'(?<!\\)"([^"]*?)(?<!\\)"', lambda m: '"' + m.group(1).replace('"', '\\"') + '"', text)
-
+    # Fix unescaped quotes in strings (more conservative approach)
+    # This is a simplified fix - for more complex cases, you might need a proper JSON parser
+    text = re.sub(r'(?<!\\)"([^"]*?)(?<!\\)"(?=\s*[,\]}])', lambda m: '"' + m.group(1).replace('"', '\\"') + '"', text)
+    
+    # Ensure the text starts with [ if it looks like an array
+    text = text.strip()
+    if not text.startswith('[') and not text.startswith('{'):
+        # Try to find the start of JSON
+        json_start = re.search(r'[\[{]', text)
+        if json_start:
+            text = text[json_start.start():]
+    
     return text
 
+
 def parse_question_json(text: str):
+    """
+    Parse JSON with better error handling and debugging
+    """
+    # Print raw text for debugging
+    print(f"Raw API response length: {len(text)}")
+    print(f"Raw API response (first 200 chars): {text[:200]}")
+    
     cleaned = clean_response_text(text)
+    print(f"Cleaned text length: {len(cleaned)}")
+    print(f"Cleaned text (first 200 chars): {cleaned[:200]}")
+    
     cleaned = repair_json(cleaned)
+    print(f"Repaired text (first 200 chars): {cleaned[:200]}")
 
+    # Try standard JSON parsing first
     try:
-        return json.loads(cleaned)
+        result = json.loads(cleaned)
+        print(f"Successfully parsed {len(result) if isinstance(result, list) else 1} questions")
+        return result
     except json.JSONDecodeError as e:
-        # Final fallback: try json5 (more lenient parsing)
-        import json5
+        print(f"Standard JSON parsing failed: {e}")
+        
+        # Try json5 as fallback (more lenient parsing)
         try:
-            return json5.loads(cleaned)
+            import json5
+            result = json5.loads(cleaned)
+            print(f"JSON5 parsing successful: {len(result) if isinstance(result, list) else 1} questions")
+            return result
         except Exception as e2:
-            st.write("⚠️ JSON parse failed:", e, e2)
-            st.write("Raw cleaned text (first 1000 chars):", cleaned[:1000])
+            print(f"JSON5 parsing also failed: {e2}")
+            
+            # Final fallback: try to extract individual questions manually
+            try:
+                # Look for question objects and try to parse them individually
+                questions = []
+                # Split by question boundaries and try to parse each
+                question_pattern = r'\{\s*"question":[^}]*?"reasoning":[^}]*?\}'
+                potential_questions = re.findall(question_pattern, cleaned, re.DOTALL)
+                
+                for q_text in potential_questions:
+                    try:
+                        q_obj = json.loads(q_text)
+                        questions.append(q_obj)
+                    except:
+                        continue
+                
+                if questions:
+                    print(f"Manual extraction successful: {len(questions)} questions")
+                    return questions
+            except:
+                pass
+            
+            # Log the error with more context
+            st.error("⚠️ JSON parse failed:")
+            st.error(f"Standard JSON error: {e}")
+            st.error(f"JSON5 error: {e2}")
+            st.text("Raw cleaned text (first 1000 chars):")
+            st.text(cleaned[:1000])
+            
             return []
-
 def filter_invalid_difficulty_alignment(questions):
     bloom_difficulty_ranges = {
         "Remember": (70, 100),
@@ -499,6 +573,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
