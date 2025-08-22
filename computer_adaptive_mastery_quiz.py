@@ -102,15 +102,18 @@ def fix_common_json_issues(text: str) -> str:
     Cleans up common JSON issues from LLM output:
     - Removes trailing commas before ] or }
     - Ensures commas between objects in arrays
+    - Adds missing commas between objects in top-level lists
     """
     # Remove trailing commas before closing brackets/braces
     text = re.sub(r",\s*([\]}])", r"\1", text)
 
-    # Add missing commas between objects in arrays
+    # Add commas between objects in arrays (fix }{)
     text = re.sub(r"}\s*{", r"}, {", text)
 
-    return text
+    # Add commas between array elements if a number/string/}] is followed by {
+    text = re.sub(r'(\}|\]|\d|"|\'))\s*{', r'\1, {', text)
 
+    return text
 
 def parse_question_json(text: str):
     """
@@ -507,6 +510,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
