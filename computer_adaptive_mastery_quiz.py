@@ -73,14 +73,59 @@ def call_deepseek_api(prompt):
     return response.json()["choices"][0]["message"]["content"], None
 
 
-def clean_response_text(text):
-    match = re.search(r"```(?:json)?\s*(.*?)```", text.strip(), re.DOTALL)
-    return match.group(1).strip() if match else text.strip()
+def clean_response_text(text: str) -> str:
+    """
+    Extracts the JSON part from a model response.
+    Strips ```json fences and trailing commentary.
+    """
+    # Remove leading/trailing whitespace
+    text = text.strip()
 
-def parse_question_json(text):
+    # Remove ```json ... ``` fences
+    fence_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1).strip()
+
+    # Try to isolate just the JSON array or object
+    array_match = re.search(r"\[.*\]", text, re.DOTALL)
+    if array_match:
+        return array_match.group(0).strip()
+
+    obj_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if obj_match:
+        return obj_match.group(0).strip()
+
+    return text
+
+def parse_question_json(text: str):
+    """
+    Attempts to parse DeepSeek output into JSON.
+    Tries multiple fallback strategies and logs failures for debugging.
+    """
+    cleaned = clean_response_text(text)
+
     try:
-        return json.loads(clean_response_text(text))
-    except Exception:
+        return json.loads(cleaned)
+    except Exception as e1:
+        # Try to find a JSON array inside the cleaned text
+        match = re.search(r"\[.*\]", cleaned, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except Exception as e2:
+                st.write("⚠️ Secondary JSON parse failed:", e2)
+
+        # Try to find a JSON object inside
+        match_obj = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if match_obj:
+            try:
+                return json.loads(match_obj.group(0))
+            except Exception as e3:
+                st.write("⚠️ Object parse failed:", e3)
+
+        # Debugging: show what we got back
+        st.write("⚠️ JSON parse failed:", e1)
+        st.write("Raw response text (first 1000 chars):", cleaned[:1000])
         return []
 
 def filter_invalid_difficulty_alignment(questions):
@@ -450,5 +495,6 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
