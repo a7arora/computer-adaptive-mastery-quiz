@@ -51,6 +51,8 @@ Avoid vague phrases like “According to the passage.” Don’t just repeat the
 All math expressions, formulas, variables, and symbols in the questions, answer choices, and explanations must be written in valid LaTeX format using $...$ for inline math and $$...$$ for display math when appropriate. This ensures proper rendering in LaTeX-supported environments.
 Return a valid JSON list of 20 questions. If there is insufficient content, as previously stated, duplicate existing questions to create a total of 20 questions at the appropriate difficulty levels 
 
+If the passage contains mostly code or table output, generate questions that test understanding of how the code works and what the outputs mean. 
+
 Passage:
 {text_chunk}
 """
@@ -448,4 +450,5 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
