@@ -51,7 +51,7 @@ Avoid vague phrases like “According to the passage.” Don’t just repeat the
 All math expressions, formulas, variables, and symbols in the questions, answer choices, and explanations must be written in valid LaTeX format using $...$ for inline math and $$...$$ for display math when appropriate. This ensures proper rendering in LaTeX-supported environments.
 Return a valid JSON list of 20 questions. If there is insufficient content, as previously stated, duplicate existing questions to create a total of 20 questions at the appropriate difficulty levels 
 
-If the passage contains mostly code or table output, generate questions that test understanding of how the code works and what the outputs mean. 
+If the passage contains mostly code or table output, generate questions that test understanding of how the code works and what the outputs mean. Every object in the JSON array must be separated by a comma, no trailing commas.
 
 Passage:
 {text_chunk}
@@ -98,30 +98,34 @@ def clean_response_text(text: str) -> str:
     return text
 
 def fix_common_json_issues(text: str) -> str:
-    # Remove trailing commas before closing braces/brackets
+    """
+    Cleans up common JSON issues from LLM output:
+    - Removes trailing commas before ] or }
+    - Ensures commas between objects in arrays
+    """
+    # Remove trailing commas before closing brackets/braces
     text = re.sub(r",\s*([\]}])", r"\1", text)
-    # Ensure objects are comma-separated
+
+    # Add missing commas between objects in arrays
     text = re.sub(r"}\s*{", r"}, {", text)
+
     return text
+
 
 def parse_question_json(text: str):
     """
-    Attempts to parse DeepSeek output into JSON.
-    Tries multiple fallback strategies and logs failures for debugging.
+    Attempts to parse DeepSeek output into JSON, with cleanup.
     """
     cleaned = clean_response_text(text)
     cleaned = fix_common_json_issues(cleaned)
 
     try:
         return json.loads(cleaned)
-    except Exception as e1:
-        # Try to find a JSON array inside the cleaned text
-        match = re.search(r"\[.*\]", cleaned, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except Exception as e2:
-                st.write("⚠️ Secondary JSON parse failed:", e2)
+    except Exception as e:
+        st.write("⚠️ JSON parse failed even after cleanup:", e)
+        st.write("Raw cleaned text (first 1000 chars):", cleaned[:1000])
+        return []
+
 
         # Try to find a JSON object inside
         match_obj = re.search(r"\{.*\}", cleaned, re.DOTALL)
@@ -503,6 +507,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
