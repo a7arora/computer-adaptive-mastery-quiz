@@ -97,52 +97,39 @@ def clean_response_text(text: str) -> str:
 
     return text
 
-def fix_common_json_issues(text: str) -> str:
-    """
-    Cleans up common JSON issues from LLM output:
-    - Removes trailing commas before ] or }
-    - Ensures commas between objects in arrays
-    - Adds missing commas between objects in top-level lists
-    """
-    # Remove trailing commas before closing brackets/braces
+def repair_json(text: str) -> str:
+    # Remove trailing commas before ] or }
     text = re.sub(r",\s*([\]}])", r"\1", text)
 
-    # Add commas between objects in arrays (fix }{)
+    # Fix }{ into }, {
     text = re.sub(r"}\s*{", r"}, {", text)
 
-    # Add commas between array elements if a number/string/}] is followed by {
-    text = re.sub(r'(\}|\]|\d|"|\')\s*{', r'\1, {', text)
+    # Fix ] [ into ], [
+    text = re.sub(r"]\s*\[", r"], [", text)
+
+    # Replace percent signs in numbers (e.g. 92% -> 92)
+    text = re.sub(r'(\d+)\s*%', r'\1', text)
+
+    # Escape unescaped quotes inside explanations
+    text = re.sub(r'(?<!\\)"([^"]*?)(?<!\\)"', lambda m: '"' + m.group(1).replace('"', '\\"') + '"', text)
 
     return text
 
-
 def parse_question_json(text: str):
-    """
-    Attempts to parse DeepSeek output into JSON, with cleanup.
-    """
     cleaned = clean_response_text(text)
-    cleaned = fix_common_json_issues(cleaned)
+    cleaned = repair_json(cleaned)
 
     try:
         return json.loads(cleaned)
-    except Exception as e:
-        st.write("⚠️ JSON parse failed even after cleanup:", e)
-        st.write("Raw cleaned text (first 1000 chars):", cleaned[:1000])
-        return []
-
-
-        # Try to find a JSON object inside
-        match_obj = re.search(r"\{.*\}", cleaned, re.DOTALL)
-        if match_obj:
-            try:
-                return json.loads(match_obj.group(0))
-            except Exception as e3:
-                st.write("⚠️ Object parse failed:", e3)
-
-        # Debugging: show what we got back
-        st.write("⚠️ JSON parse failed:", e1)
-        st.write("Raw response text (first 1000 chars):", cleaned[:1000])
-        return []
+    except json.JSONDecodeError as e:
+        # Final fallback: try json5 (more lenient parsing)
+        import json5
+        try:
+            return json5.loads(cleaned)
+        except Exception as e2:
+            st.write("⚠️ JSON parse failed:", e, e2)
+            st.write("Raw cleaned text (first 1000 chars):", cleaned[:1000])
+            return []
 
 def filter_invalid_difficulty_alignment(questions):
     bloom_difficulty_ranges = {
@@ -511,6 +498,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
