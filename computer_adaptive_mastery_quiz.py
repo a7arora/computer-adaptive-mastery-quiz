@@ -76,9 +76,8 @@ def call_deepseek_api(prompt):
 def clean_response_text(text: str) -> str:
     """
     Extracts the JSON part from a model response.
-    Strips ```json fences and trailing commentary.
+    Strips ```json fences, trailing commentary, and truncates at the last bracket.
     """
-    # Remove leading/trailing whitespace
     text = text.strip()
 
     # Remove ```json ... ``` fences
@@ -86,16 +85,18 @@ def clean_response_text(text: str) -> str:
     if fence_match:
         text = fence_match.group(1).strip()
 
-    # Try to isolate just the JSON array or object
-    array_match = re.search(r"\[.*\]", text, re.DOTALL)
-    if array_match:
-        return array_match.group(0).strip()
+    # Truncate at the last closing square bracket ] if it exists
+    if "[" in text and "]" in text:
+        text = text[: text.rfind("]") + 1]
+        return text.strip()
 
-    obj_match = re.search(r"\{.*\}", text, re.DOTALL)
-    if obj_match:
-        return obj_match.group(0).strip()
+    # Otherwise, truncate at the last closing curly brace }
+    if "{" in text and "}" in text:
+        text = text[: text.rfind("}") + 1]
+        return text.strip()
 
     return text
+
 
 def repair_json(text: str) -> str:
     # Remove trailing commas before ] or }
@@ -498,6 +499,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
