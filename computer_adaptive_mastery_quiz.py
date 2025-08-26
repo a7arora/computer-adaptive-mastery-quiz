@@ -33,6 +33,7 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
 - Present all necessary context within the question itself
 - Students should be able to answer based on their understanding of the concepts, not memory of where things appeared in the text
 - Frame questions as direct concept tests, not reading comprehension
+- If there is information about ISBN or ebook distribution consequences or copyrights, do not ask questions about these things. Only ask questions about academic content
 
 **Example of what NOT to do:**
 ❌ "According to the passage, what does the first example demonstrate?"
@@ -592,6 +593,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
