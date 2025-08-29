@@ -14,7 +14,7 @@ headers = {
     "Content-Type": "application/json"
 }
 CLAUDE_URL = "https://api.anthropic.com/v1/messages"
-MODEL_NAME = "claude-sonnet-4-20240514"
+MODEL_NAME = "claude-sonnet-4-20250514"
 
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
@@ -593,6 +593,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
