@@ -25,7 +25,6 @@ def generate_prompt(text_chunk):
 You are a teacher who is designing a test with multiple choice questions (each with 4 answer choices) to test content from a passage.
 
 Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
-
 **CRITICAL REQUIREMENT - NO TEXT REFERENCES:**
 - Questions must be COMPLETELY SELF-CONTAINED and not reference the original text
 - DO NOT use phrases like "according to the passage," "the text states," "the first example," "as mentioned," "the author discusses," etc.
@@ -45,6 +44,7 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
 
 **Requirements**:
 - 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard(<40%)
+You tend to make the questions easier than the respective labels(for instance, you make hard questions that 60% of students answer correctly or medium-hard questions that 70% of students answer correctly), so please try to make the questions more significantly more challenging than you would think they should be for medium-hard and hard questions
 
 **Each question must include the following fields:**
 
@@ -593,6 +593,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
