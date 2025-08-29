@@ -6,15 +6,15 @@ import json
 import re
 import random
 
-
-API_KEY = st.secrets["DEEPSEEK_API_KEY"]
+API_KEY = st.secrets["ANTHROPIC_API_KEY"]
 
 headers = {
-    "Authorization": f"Bearer {API_KEY}",
+    "x-api-key": f"{API_KEY}",
+    "anthropic-version": "2023-06-01",
     "Content-Type": "application/json"
 }
-DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
-MODEL_NAME = "deepseek-chat"  
+CLAUDE_URL = "https://api.anthropic.com/v1/messages"
+MODEL_NAME = "claude-4-sonnet-20240522"
 
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
@@ -77,20 +77,20 @@ Passage:
 {text_chunk}
 """
 
-def call_deepseek_api(prompt):
+def call_claude_api(prompt):
     data = {
         "model": MODEL_NAME,
-        "messages": [
-            {"role": "system", "content": "You are a helpful educational assistant."},
-            {"role": "user", "content": prompt}
-        ],
+        "max_tokens": 4500,
         "temperature": 0.7,
-        "max_tokens": 4500
+        "system": "You are a helpful educational assistant.",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
     }
-    response = requests.post(DEEPSEEK_URL, headers=headers, json=data)
+    response = requests.post(CLAUDE_URL, headers=headers, json=data)
     if response.status_code != 200:
         return None, response.text
-    return response.json()["choices"][0]["message"]["content"], None
+    return response.json()["content"][0]["text"], None
 
 
 def clean_response_text(text: str) -> str:
@@ -422,7 +422,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
 ---
 
-**Built using the DeepSeek-R1-0528 model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. Please keep in mind that it currently takes about 4-5 minutes to generate questions from a pdf... please be patient as it generates questions. Furthermore, it only accepts text output and cannot read handwriting or drawings at this time.
+**Built using the Claude-4 Sonnet model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. Please keep in mind that it currently takes about 4-5 minutes to generate questions from a pdf... please be patient as it generates questions. Furthermore, it only accepts text output and cannot read handwriting or drawings at this time.
 
 ---
 """)
@@ -444,7 +444,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
             for chunk in chunks_to_use:
                 prompt = generate_prompt(chunk)
-                response_text, error = call_deepseek_api(prompt)
+                response_text, error = call_claude_api(prompt)
                 if error:
                     st.error("API error: " + error)
                     continue
@@ -593,6 +593,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
