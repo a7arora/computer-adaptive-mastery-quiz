@@ -590,13 +590,10 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             df = pd.DataFrame(st.session_state.all_questions)
             csv_data = df.to_csv(index=False)
             st.download_button(
-                label="📥 Download All Quiz Questions (JSON)",
-                data=all_qs_json,
-                file_name="ascendquiz_questions.json",
-                mime="application/json",
-            data=csv_data,
-            file_name="ascendquiz_questions.csv",
-            mime="text/csv"
-            )
+    label="📥 Download All Quiz Questions (CSV)",
+    data=csv_data,
+    file_name="ascendquiz_questions.csv",
+    mime="text/csv")
+
 
 
