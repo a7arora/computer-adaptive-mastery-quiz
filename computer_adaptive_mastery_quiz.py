@@ -516,62 +516,70 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 grouped_chunks = ["\n\n".join(chunks[i:i+3]) for i in range(0, len(chunks), 3)]
 
             all_questions = []
-            total_chunks = min(4, len(grouped_chunks))  # Limit to 4 chunks max
-            
-            for ci, chunk in enumerate(grouped_chunks[:total_chunks]):
-                status_text.text(f"Processing chunk {ci+1}/{total_chunks}...")
-                progress_bar.progress((ci + 0.5) / total_chunks)
-                
-                prompt = generate_prompt(chunk)
-                response_text, error = call_claude_api(prompt)
-                
-                if error:
-                    st.error(f"❌ Failed to generate questions for chunk {ci+1}: {error}")
-                    continue
-                    
+            total_chunks = min(4, len(grouped_chunks))  # still cap at 4
+            first_chunk, *rest_chunks = grouped_chunks[:total_chunks]
+
+            # Process first chunk immediately
+            status_text.text("Processing first chunk...")
+            progress_bar.progress(0.3)
+
+            prompt = generate_prompt(first_chunk)
+            response_text, error = call_claude_api(prompt)
+
+            if error:
+                st.error(f"❌ Failed to generate questions for first chunk: {error}")
+            else:
                 parsed = parse_question_json(response_text)
                 valid, invalid = filter_invalid_difficulty_alignment(parsed)
-                
+
                 if valid:
                     all_questions.extend(valid)
-                    st.success(f"✅ Generated {len(valid)} valid questions from chunk {ci+1}")
+                    st.success(f"✅ Generated {len(valid)} valid questions from first chunk")
                 else:
-                    st.warning(f"⚠️ No valid questions generated from chunk {ci+1}")
-                
+                    st.warning("⚠️ No valid questions from first chunk")
+
                 if invalid:
-                    st.warning(f"⚠️ {len(invalid)} questions from chunk {ci+1} were filtered out due to invalid difficulty alignment")
-                
-                progress_bar.progress((ci + 1) / total_chunks)
-            
-            progress_bar.empty()
-            status_text.empty()
+                    st.warning(f"⚠️ {len(invalid)} questions filtered out from first chunk")
+            # Save remaining chunks for background loading
+            st.session_state.pending_batches = rest_chunks
+
         
         if all_questions:
             st.session_state.all_questions = all_questions
             st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
             st.session_state.quiz_state = {
-                "current_difficulty": 4,
-                "asked": set(),
-                "answers": [],
-                "quiz_end": False,
-                "current_q_idx": None,
-                "current_q": None,
-                "show_explanation": False,
-                "last_correct": None,
-                "last_explanation": None,
-            }
-            
-            # Show question distribution
-            diff_counts = {d: len(qs) for d, qs in st.session_state.questions_by_difficulty.items() if qs}
-            st.success(f"🎉 Generated {len(all_questions)} total questions!")
-            st.info(f"Distribution by difficulty: {diff_counts}")
-            
+        "current_difficulty": 4,
+        "asked": set(),
+        "answers": [],
+        "quiz_end": False,
+        "current_q_idx": None,
+        "current_q": None,
+        "show_explanation": False,
+        "last_correct": None,
+        "last_explanation": None,
+    }
             st.session_state.quiz_ready = True
             st.rerun()
-        else:
-            st.error("❌ No valid questions were generated. Please try with a different PDF or check your content.")
+    else:
+        st.error("❌ Could not generate any valid questions from the first chunk.")
 
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
+    # Background loading of pending batches
+    if "pending_batches" in st.session_state and st.session_state.pending_batches:
+        next_chunk = st.session_state.pending_batches.pop(0)
+        with st.spinner("Loading more questions in background..."):
+            response_text, error = call_claude_api(generate_prompt(next_chunk))
+            if not error:
+                parsed = parse_question_json(response_text)
+                valid, invalid = filter_invalid_difficulty_alignment(parsed)
+                if valid:
+                    st.session_state.all_questions.extend(valid)
+                    grouped = group_by_difficulty(valid)
+                    for d, qs in grouped.items():
+                        st.session_state.questions_by_difficulty[d].extend(qs)
+                if invalid:
+                    st.warning(f"⚠️ {len(invalid)} questions filtered out from background batch")
+
     all_qs = st.session_state.questions_by_difficulty
     state = st.session_state.get("quiz_state", None)
 
@@ -712,3 +720,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             st.rerun()
+
