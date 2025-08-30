@@ -478,8 +478,8 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
 score = compute_mastery_score(st.session_state.get("quiz_state", {}).get("answers", []))
 render_mastery_bar(score) 
-    uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
-    if uploaded_pdf:
+uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
+if uploaded_pdf:
         with st.spinner("Generating questions..."):
             chunks = extract_text_from_pdf(uploaded_pdf)
             # Adaptive chunking
@@ -639,6 +639,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.csv",
                 mime="text/csv"
             )
+
 
 
 
