@@ -5,20 +5,7 @@ import requests
 import json
 import re
 import random
-import io
-from typing import List, Tuple
 
-# --- NEW: OCR dependencies ---
-try:
-    from PIL import Image, ImageOps, ImageFilter
-    import pytesseract
-    TESS_AVAILABLE = True
-except Exception:
-    TESS_AVAILABLE = False
-
-# =============================
-# Config & API
-# =============================
 API_KEY = st.secrets["ANTHROPIC_API_KEY_1"]
 
 headers = {
@@ -29,100 +16,9 @@ headers = {
 CLAUDE_URL = "https://api.anthropic.com/v1/messages"
 MODEL_NAME = "claude-sonnet-4-20250514"
 
-# =============================
-# OCR Helpers
-# =============================
-
-def page_to_image(page: fitz.Page, zoom: float = 2.0) -> Image.Image:
-    """Render a PDF page to a PIL Image at the given zoom (scaling)."""
-    mat = fitz.Matrix(zoom, zoom)
-    pix = page.get_pixmap(matrix=mat, alpha=False)
-    img_bytes = pix.tobytes("png")
-    return Image.open(io.BytesIO(img_bytes)).convert("RGB")
-
-
-def preprocess_for_ocr(img: Image.Image, mode: str = "auto") -> Image.Image:
-    """Lightweight preprocessing to improve OCR. Modes: auto|grayscale|binarize|sharpen|none"""
-    if mode == "none":
-        return img
-
-    if mode == "grayscale" or mode == "auto":
-        img = ImageOps.grayscale(img)
-
-    if mode in ("binarize", "auto"):
-        # simple adaptive-like threshold: blur + point
-        img = img.filter(ImageFilter.MedianFilter(size=3))
-        img = img.point(lambda x: 255 if x > 160 else 0)
-
-    if mode == "sharpen":
-        img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
-
-    return img
-
-
-def ocr_image(img: Image.Image, lang: str = "eng") -> str:
-    if not TESS_AVAILABLE:
-        return ""
-    try:
-        return pytesseract.image_to_string(img, lang=lang)
-    except Exception:
-        return ""
-
-
-# =============================
-# PDF Text Extraction (Text + OCR fallback)
-# =============================
-
-def extract_text_from_pdf_or_ocr(
-    pdf_file,
-    enable_ocr: bool = True,
-    text_min_len_for_page: int = 60,
-    zoom: float = 2.0,
-    ocr_lang: str = "eng",
-    preprocess_mode: str = "auto",
-) -> List[str]:
-    """
-    Extract text from a PDF. For each page, first try live text from the PDF.
-    If the page has too little text and OCR is enabled, rasterize and OCR it.
-    Returns a list of non-empty page strings.
-    """
-    # Open once using bytes buffer (Streamlit uploaded file is a BytesIO-like object)
-    file_bytes = pdf_file.read()
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
-
-    pages_text: List[str] = []
-
-    progress = st.progress(0, text="Reading PDF…")
-    total_pages = len(doc)
-
-    for i, page in enumerate(doc):
-        raw_text = page.get_text().strip()
-        page_text = raw_text
-
-        # If little or no extractable text and OCR is enabled, try OCR
-        if enable_ocr and (len(raw_text) < text_min_len_for_page):
-            img = page_to_image(page, zoom=zoom)
-            img = preprocess_for_ocr(img, mode=preprocess_mode)
-            ocr_text = ocr_image(img, lang=ocr_lang).strip()
-
-            # If both exist, prefer the longer one (helps with mixed content)
-            if len(ocr_text) > len(raw_text):
-                page_text = ocr_text
-
-        if page_text:
-            pages_text.append(page_text)
-
-        progress.progress((i + 1) / max(total_pages, 1), text=f"Processed page {i+1}/{total_pages}")
-
-    progress.empty()
-
-    # Final sanity pass: drop empty strings
-    return [t for t in pages_text if t and t.strip()]
-
-
-# =============================
-# Prompting & LLM
-# =============================
+def extract_text_from_pdf(pdf_file):
+    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+    return [page.get_text() for page in doc if page.get_text().strip()]
 
 def generate_prompt(text_chunk):
     return f"""
@@ -204,7 +100,6 @@ Passage:
 {text_chunk}
 """
 
-
 def call_claude_api(prompt):
     data = {
         "model": MODEL_NAME,
@@ -220,108 +115,164 @@ def call_claude_api(prompt):
         return None, response.text
     return response.json()["content"][0]["text"], None
 
-
-# =============================
-# JSON Cleaning / Parsing (unchanged)
-# =============================
-
 def clean_response_text(text: str) -> str:
+    """
+    Extracts the JSON part from a model response with improved cleaning.
+    """
     text = text.strip()
+
+    # Remove ```json fences and other markdown formatting
     fence_patterns = [
         r"```json\s*(.*?)```",
         r"```\s*(.*?)```",
         r"`{3,}\s*json\s*(.*?)`{3,}",
         r"`{3,}\s*(.*?)`{3,}"
     ]
+
     for pattern in fence_patterns:
         fence_match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
         if fence_match:
             text = fence_match.group(1).strip()
             break
+
+    # Find the JSON array boundaries
     start_idx = text.find('[')
     end_idx = text.rfind(']')
+
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         json_text = text[start_idx:end_idx + 1]
         return json_text.strip()
+
     return text
 
-
 def repair_json(text: str) -> str:
+    """
+    Enhanced JSON repair function to handle common formatting issues.
+    """
+    # Remove trailing commas before ] or }
     text = re.sub(r',\s*([\]}])', r'\1', text)
+    
+    # Fix }{ into }, {
     text = re.sub(r'}\s*{', r'}, {', text)
+    
+    # Fix ] [ into ], [
     text = re.sub(r']\s*\[', r'], [', text)
+    
+    # Replace percent signs in numbers (e.g. 92% -> 92)
     text = re.sub(r'(\d+)\s*%', r'\1', text)
+    
+    # Fix common escape issues
     text = text.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
-
+    
+    # Handle malformed options objects and convert to arrays
     def convert_options_object_to_array(match):
         options_content = match.group(1)
+        # Extract A, B, C, D values
         option_pattern = r'"[A-D]":\s*"([^"]*)"'
         options = re.findall(option_pattern, options_content)
         if len(options) == 4:
             options_array = json.dumps(options)
             return f'"options": {options_array}'
-        return match.group(0)
-
+        return match.group(0)  # Return original if can't parse
+    
+    # Convert {"A": "...", "B": "...", "C": "...", "D": "..."} to ["...", "...", "...", "..."]
     text = re.sub(r'"options":\s*\{([^}]+)\}', convert_options_object_to_array, text)
+    
     return text
 
-
-def validate_question_structure(question, index):
-    required_fields = ["question", "options", "correct_answer", "explanation", "cognitive_level", "estimated_correct_pct", "reasoning"]
-    if not isinstance(question, dict):
-        return False
-    for field in required_fields:
-        if field not in question:
-            return False
-    if not isinstance(question["options"], list) or len(question["options"]) != 4:
-        return False
-    if str(question["correct_answer"]).upper() not in ["A", "B", "C", "D"]:
-        return False
-    return True
-
-
-def extract_questions_manually(text):
-    questions = []
-    question_pattern = r'\{\s*"question":[^}]*?"reasoning":[^}]*?\}'
-    potential_questions = re.findall(question_pattern, text, re.DOTALL)
-    for q_text in potential_questions:
-        try:
-            repaired = repair_json(q_text)
-            q_obj = json.loads(repaired)
-            if validate_question_structure(q_obj, len(questions)):
-                questions.append(q_obj)
-        except Exception:
-            continue
-    return questions
-
-
 def parse_question_json(text: str):
+    """
+    Enhanced JSON parsing with better error handling.
+    """
+    print(f"Raw API response length: {len(text)}")
+    print(f"Raw API response (first 500 chars): {text[:500]}")
+
     cleaned = clean_response_text(text)
+    print(f"Cleaned text length: {len(cleaned)}")
+    
     cleaned = repair_json(cleaned)
+    print(f"After repair (first 500 chars): {cleaned[:500]}")
+
+    # Try standard JSON parsing
     try:
         result = json.loads(cleaned)
         if isinstance(result, list):
+            print(f"Successfully parsed {len(result)} questions")
+            # Validate question structure
             valid_questions = []
             for i, q in enumerate(result):
                 if validate_question_structure(q, i):
                     valid_questions.append(q)
             return valid_questions
         else:
+            print("Result is not a list")
             return []
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        print(f"Standard JSON parsing failed: {e}")
+        print(f"Error at position: {e.pos}")
+        print(f"Context around error: {cleaned[max(0, e.pos-50):e.pos+50]}")
+        
+        # Try to extract individual questions manually
         try:
             questions = extract_questions_manually(cleaned)
             if questions:
+                print(f"Manual extraction successful: {len(questions)} questions")
                 return questions
-        except Exception:
-            pass
+        except Exception as e2:
+            print(f"Manual extraction failed: {e2}")
+
         st.error("⚠️ JSON parsing failed. Please try uploading the PDF again.")
+        st.error(f"Error details: {str(e)}")
         return []
 
+def validate_question_structure(question, index):
+    """
+    Validate that a question has the required structure.
+    """
+    required_fields = ["question", "options", "correct_answer", "explanation", "cognitive_level", "estimated_correct_pct", "reasoning"]
+    
+    if not isinstance(question, dict):
+        print(f"Question {index}: Not a dictionary")
+        return False
+    
+    for field in required_fields:
+        if field not in question:
+            print(f"Question {index}: Missing field '{field}'")
+            return False
+    
+    # Validate options is an array of 4 items
+    if not isinstance(question["options"], list) or len(question["options"]) != 4:
+        print(f"Question {index}: Options must be an array of 4 items")
+        return False
+    
+    # Validate correct_answer is A, B, C, or D
+    if question["correct_answer"].upper() not in ["A", "B", "C", "D"]:
+        print(f"Question {index}: Invalid correct_answer '{question['correct_answer']}'")
+        return False
+    
+    return True
 
-# =============================
-# Difficulty Binning (unchanged)
-# =============================
+def extract_questions_manually(text):
+    """
+    Fallback method to extract questions when JSON parsing fails.
+    """
+    questions = []
+    
+    # Try to find individual question objects
+    question_pattern = r'\{\s*"question":[^}]*?"reasoning":[^}]*?\}'
+    potential_questions = re.findall(question_pattern, text, re.DOTALL)
+    
+    for q_text in potential_questions:
+        try:
+            # Try to repair this individual question
+            repaired = repair_json(q_text)
+            q_obj = json.loads(repaired)
+            if validate_question_structure(q_obj, len(questions)):
+                questions.append(q_obj)
+        except:
+            continue
+    
+    return questions
 
 def filter_invalid_difficulty_alignment(questions):
     bloom_difficulty_ranges = {
@@ -332,29 +283,36 @@ def filter_invalid_difficulty_alignment(questions):
         "Evaluate": (0, 60),
         "Create": (0, 50)
     }
+
     valid = []
     invalid = []
+
     for q in questions:
         if not isinstance(q, dict):
             invalid.append(q)
             continue
+
         cog = str(q.get("cognitive_level", "")).strip().capitalize()
         try:
             pct = int(q.get("estimated_correct_pct", -1))
         except Exception:
             pct = -1
+
         if cog in bloom_difficulty_ranges and 0 <= pct <= 100:
             low, high = bloom_difficulty_ranges[cog]
-            (valid if (low <= pct <= high) else invalid).append(q)
+            if low <= pct <= high:
+                valid.append(q)
+            else:
+                invalid.append(q)
         else:
             invalid.append(q)
-    return valid, invalid
 
+    return valid, invalid
 
 def assign_difficulty_label(estimated_pct):
     try:
         pct = int(estimated_pct)
-    except Exception:
+    except:
         return None
     if pct < 30: return 8
     elif pct < 40: return 7
@@ -364,7 +322,6 @@ def assign_difficulty_label(estimated_pct):
     elif pct < 85: return 3
     elif pct < 90: return 2
     else: return 1
-
 
 def group_by_difficulty(questions):
     groups = {i: [] for i in range(1, 9)}
@@ -376,22 +333,23 @@ def group_by_difficulty(questions):
             groups[label].append(q)
     return groups
 
-
 def pick_question(diff, asked, all_qs):
     pool = all_qs.get(diff, [])
     return [(i, q) for i, q in enumerate(pool) if (diff, i) not in asked]
 
-
 def find_next_difficulty(current_diff, going_up, asked, all_qs):
     next_diff = current_diff + 1 if going_up else current_diff - 1
+
     if 1 <= next_diff <= 8 and pick_question(next_diff, asked, all_qs):
         return next_diff
-    search_range = (range(next_diff + 1, 9) if going_up else range(next_diff - 1, 0, -1))
+    
+    search_range = (
+        range(next_diff + 1, 9) if going_up else range(next_diff - 1, 0, -1)
+    )
     for d in search_range:
         if pick_question(d, asked, all_qs):
             return d
     return current_diff
-
 
 def get_next_question(current_diff, asked, all_qs):
     available = pick_question(current_diff, asked, all_qs)
@@ -400,150 +358,171 @@ def get_next_question(current_diff, asked, all_qs):
     idx, q = random.choice(available)
     return current_diff, idx, q
 
+def accuracy_on_levels(answers, levels):
+    filtered = [c for d, c in answers if d in levels]
+    return sum(filtered) / len(filtered) if filtered else 0
 
-def compute_mastery_score(answers: List[Tuple[int, bool]]):
+def compute_mastery_score(answers):
     mastery_bands = {
         (1, 2): 25,
         (3, 4): 65,
         (5, 6): 85,
         (7, 8): 100
     }
-    min_attempts_required = 3
+
+    min_attempts_required = 3 
     band_scores = []
+
     for levels, weight in mastery_bands.items():
         relevant = [correct for d, correct in answers if d in levels]
         attempts = len(relevant)
+
         if attempts == 0:
-            continue
+            continue  
+        
         acc = sum(relevant) / attempts
-        normalized_score = max((acc - 0.25) / 0.75, 0)
+        normalized_score = max((acc - 0.25) / 0.75, 0) 
+
         if attempts < min_attempts_required:
             scaled_score = normalized_score * weight * (attempts / min_attempts_required)
             band_scores.append(scaled_score)
         else:
-            band_scores.append(normalized_score * weight)
+            band_score = normalized_score * weight
+            band_scores.append(band_score)
+
     if not band_scores:
-        return 0
+        return 0  
+
     return int(round(max(band_scores)))
 
-
-# =============================
-# UI helpers
-# =============================
-
+# App frontend
 def render_mastery_bar(score):
     if score < 30:
-        color = "red"; text_color = "white"
+        color = "red"
+        text_color = "white"
     elif score < 50:
-        color = "yellow"; text_color = "black"
+        color = "yellow"
+        text_color = "black"
     else:
-        color = "green"; text_color = "white"
+        color = "green"
+        text_color = "white"
+
     st.markdown(f"""
     <style>
-        .mastery-bar-wrapper {{ position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; background-color: white; padding: 8px 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }}
-        .mastery-bar {{ border: 1px solid #ccc; border-radius: 8px; overflow: hidden; height: 24px; width: 100%; background-color: #eee; }}
-        .mastery-bar-fill {{ height: 100%; width: {score}%; background-color: {color}; text-align: center; color: {text_color}; font-weight: bold; line-height: 24px; }}
-        .spacer {{ height: 60px; }}
+        .mastery-bar-wrapper {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 9999;
+            background-color: white;
+            padding: 8px 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }}
+        .mastery-bar {{
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 24px;
+            width: 100%;
+            background-color: #eee;
+        }}
+        .mastery-bar-fill {{
+            height: 100%;
+            width: {score}%;
+            background-color: {color};
+            text-align: center;
+            color: {text_color};
+            font-weight: bold;
+            line-height: 24px;
+        }}
+        .spacer {{
+            height: 60px;
+        }}
     </style>
-    <div class="mastery-bar-wrapper"><div class="mastery-bar"><div class="mastery-bar-fill">{score}%</div></div></div><div class="spacer"></div>
+
+    <div class="mastery-bar-wrapper">
+        <div class="mastery-bar">
+            <div class="mastery-bar-fill">{score}%</div>
+        </div>
+    </div>
+    <div class="spacer"></div>
     """, unsafe_allow_html=True)
+ 
+st.title("AscendQuiz")
 
-
-# =============================
-# App
-# =============================
-
-st.title("AscendQuiz (OCR-enabled)")
-
-# Sidebar OCR controls
-with st.sidebar:
-    st.subheader("OCR Settings")
-    enable_ocr = st.checkbox("Enable OCR for image-only or low-text pages", value=True)
-    ocr_lang = st.text_input("Tesseract language codes (comma-separated)", value="eng")
-    zoom = st.slider("Rasterization scale (affects OCR quality)", min_value=1.0, max_value=3.0, value=2.0, step=0.1)
-    text_thresh = st.number_input("Min extracted characters before using OCR", min_value=0, max_value=2000, value=60, step=10)
-    preprocess_mode = st.selectbox("Preprocessing", options=["auto", "grayscale", "binarize", "sharpen", "none"], index=0)
-    if not TESS_AVAILABLE:
-        st.info("pytesseract/Pillow not detected. Install Tesseract OCR and the pytesseract Python package on your host.")
-        st.caption("Ubuntu example: `sudo apt-get update && sudo apt-get install -y tesseract-ocr libtesseract-dev && pip install pytesseract pillow`\nAdd extra language packs like `tesseract-ocr-spa` for Spanish, etc.")
 
 if "all_questions" not in st.session_state:
     st.markdown("""
 Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
 
-**New:** This version can read scanned/image-only PDFs using OCR. Use the sidebar to configure OCR language, scaling, and preprocessing.
+**How it works:**
+This app uses a large language model (LLM) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
+
+The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once your **mastery score reaches 50% or higher** (calculated using your accuracy weighted by difficulty level), the system considers you to have achieved **mastery** and ends the quiz.
+
+Each question includes:
+- Four answer options
+- The correct answer
+- An explanation
+- A predicted correctness percentage
+
+Unlike static tools like Khanmigo, this app uses generative AI to dynamically create the quiz from **your own content** — no rigid question banks required.
+
+---
+
+**Built using the Claude-4 Sonnet model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. Please keep in mind that it currently takes about 4-5 minutes to generate questions from a pdf... please be patient as it generates questions. Furthermore, it only accepts text output and cannot read handwriting or drawings at this time.
 
 ---
 """)
 
 score = compute_mastery_score(st.session_state.get("quiz_state", {}).get("answers", []))
-render_mastery_bar(score)
-
+render_mastery_bar(score) 
 uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
-
 if uploaded_pdf:
-    with st.spinner("Extracting text (with OCR fallback)…"):
-        # IMPORTANT: Streamlit uploads are one-shot read; pass a copy to our function
-        uploaded_pdf.seek(0)
-        chunks = extract_text_from_pdf_or_ocr(
-            uploaded_pdf,
-            enable_ocr=enable_ocr,
-            text_min_len_for_page=text_thresh,
-            zoom=zoom,
-            ocr_lang="+".join([c.strip() for c in ocr_lang.split(",") if c.strip()]) or "eng",
-            preprocess_mode=preprocess_mode,
-        )
+        with st.spinner("Generating questions..."):
+            chunks = extract_text_from_pdf(uploaded_pdf)
+            # Adaptive chunking
+            if len(chunks) <= 2:
+                grouped_chunks = ["\n\n".join(chunks)]
+            else:
+                grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
 
-    if not chunks:
-        st.error("Couldn't extract any text (even with OCR). Try increasing the rasterization scale or enabling OCR.")
-        st.stop()
+            all_questions = []
+            chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
 
-    with st.expander("Preview extracted text (first 2 pages)"):
-        preview = "\n\n----\n\n".join(chunks[:2])
-        st.text_area("Text preview", preview, height=250)
-
-    with st.spinner("Generating questions…"):
-        # Adaptive chunking
-        if len(chunks) <= 2:
-            grouped_chunks = ["\n\n".join(chunks)]
-        else:
-            grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
-
-        all_questions = []
-        chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
-
-        for chunk in chunks_to_use:
-            prompt = generate_prompt(chunk)
-            response_text, error = call_claude_api(prompt)
-            if error:
-                st.error("API error: " + error)
-                continue
-            parsed = parse_question_json(response_text)
-            valid, invalid = filter_invalid_difficulty_alignment(parsed)
-            all_questions.extend(valid)
-            if "filtered_questions" not in st.session_state:
-                st.session_state.filtered_questions = []
-            st.session_state.filtered_questions.extend(invalid)
-
-        if all_questions:
-            st.session_state.all_questions = all_questions
-            st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
-            st.session_state.quiz_state = {
-                "current_difficulty": 4,
-                "asked": set(),
-                "answers": [],
-                "quiz_end": False,
-                "current_q_idx": None,
-                "current_q": None,
-                "show_explanation": False,
-                "last_correct": None,
-                "last_explanation": None,
-            }
-            st.success(f"✅ Questions generated! Starting the quiz with {len(all_questions)} questions…")
-            st.session_state.quiz_ready = True
-            st.rerun()
-        else:
-            st.error("No questions were generated. Please try again with a different PDF or tweak OCR settings.")
+            for chunk in chunks_to_use:
+                prompt = generate_prompt(chunk)
+                response_text, error = call_claude_api(prompt)
+                if error:
+                    st.error("API error: " + error)
+                    continue
+                parsed = parse_question_json(response_text)
+                valid, invalid = filter_invalid_difficulty_alignment(parsed)
+                all_questions.extend(valid)
+                if "filtered_questions" not in st.session_state:
+                    st.session_state.filtered_questions = []
+                st.session_state.filtered_questions.extend(invalid)
+            
+            if all_questions:
+                st.session_state.all_questions = all_questions
+                st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
+                st.session_state.quiz_state = {
+                    "current_difficulty": 4,
+                    "asked": set(),
+                    "answers": [],
+                    "quiz_end": False,
+                    "current_q_idx": None,
+                    "current_q": None,
+                    "show_explanation": False,
+                    "last_correct": None,
+                    "last_explanation": None,
+                }
+                st.success(f"✅ Questions generated! Starting the quiz with {len(all_questions)} questions...")
+                st.session_state.quiz_ready = True
+                st.rerun()
+            else:
+                st.error("No questions were generated. Please try again with a different PDF.")
 
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
@@ -554,7 +533,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         st.stop()
 
     score = compute_mastery_score(state.get("answers", []))
-
+    
     if not state["quiz_end"]:
         if state["current_q"] is None and not state.get("show_explanation", False):
             diff, idx, q = get_next_question(state["current_difficulty"], state["asked"], all_qs)
@@ -571,13 +550,19 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
         st.markdown(q["question"], unsafe_allow_html=True)
-
+        
         def strip_leading_label(text):
-            return re.sub(r"^[A-Da-d][\).:\-]?\s+", "", str(text)).strip()
+            return re.sub(r"^[A-Da-d][\).:\-]?\s+", "", text).strip()
 
         option_labels = ["A", "B", "C", "D"]
         cleaned_options = [strip_leading_label(str(opt)) for opt in q["options"]]
-        rendered_options = [f"{label}. {text}" for label, text in zip(option_labels, cleaned_options)]
+        rendered_options = []
+        for label, text in zip(option_labels, cleaned_options):
+            if "$" in text or "\\" in text:
+                rendered_text = f"{label}. {text}"
+            else:
+                rendered_text = f"{label}. {text}"
+            rendered_options.append(rendered_text)
 
         selected = st.radio("Select your answer:", options=rendered_options, key=f"radio_{idx}", index=None)
 
@@ -585,10 +570,10 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             if selected is None:
                 st.warning("Please select an answer before submitting.")
                 st.stop()
-
+                
             selected_letter = selected.split(".")[0].strip().upper()
             letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
-            correct_letter = str(q["correct_answer"]).strip().upper()
+            correct_letter = q["correct_answer"].strip().upper()
             correct_index = letter_to_index.get(correct_letter, None)
 
             if correct_index is None:
@@ -597,22 +582,30 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 st.stop()
 
             correct = (selected_letter == correct_letter)
+
+            # Record answer
             state["asked"].add((state["current_difficulty"], idx))
             state["answers"].append((state["current_difficulty"], correct))
             state["last_correct"] = correct
             state["last_explanation"] = q["explanation"]
             state["show_explanation"] = True
 
+            # Update mastery score
             score = compute_mastery_score(state["answers"])
             if score >= 50:
                 state["quiz_end"] = True
 
         if state.get("show_explanation", False):
-            st.success("✅ Correct!") if state["last_correct"] else st.error("❌ Incorrect.")
+            if state["last_correct"]:
+                st.success("✅ Correct!")
+            else:
+                st.error("❌ Incorrect.")
+            
             st.markdown("**Explanation:**")
             st.markdown(state["last_explanation"], unsafe_allow_html=True)
 
             if st.button("Next Question"):
+                # Adjust difficulty based on performance
                 if state["last_correct"]:
                     state["current_difficulty"] = find_next_difficulty(
                         state["current_difficulty"], going_up=True, asked=state["asked"], all_qs=all_qs
@@ -621,6 +614,8 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                     state["current_difficulty"] = find_next_difficulty(
                         state["current_difficulty"], going_up=False, asked=state["asked"], all_qs=all_qs
                     )
+                
+                # Clear current question to trigger fetching a new one
                 state["current_q"] = None
                 state["current_q_idx"] = None
                 state["show_explanation"] = False
@@ -644,4 +639,8 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.csv",
                 mime="text/csv"
             )
+
+
+
+
 
