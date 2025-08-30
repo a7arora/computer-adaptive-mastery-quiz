@@ -428,60 +428,71 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 """)
 
 
-    uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
-    if uploaded_pdf:
-        with st.spinner("Generating first batch of questions..."):
-            chunks = extract_text_from_pdf(uploaded_pdf)
+uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
+if uploaded_pdf:
+    with st.spinner("Generating first batch of questions..."):
+        chunks = extract_text_from_pdf(uploaded_pdf)
 
-        # Adaptive chunking (same as before)
-            if len(chunks) <= 2:
-                grouped_chunks = ["\n\n".join(chunks)]  
-            else:
-                grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
+    # Adaptive chunking
+    if len(chunks) <= 2:
+        grouped_chunks = ["\n\n".join(chunks)]  
+    else:
+        grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
 
-            all_questions = []
-            first_batch = []
+    all_questions = []
+    first_batch = []
 
-        # Pick first 2 chunks (like before) OR duplicate if only 1
-            chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
+    # Pick first 2 chunks (or duplicate if only 1 exists)
+    chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
 
-            for ci, chunk in enumerate(chunks_to_use):
-                for call_idx in range(3):  # 3 calls per chunk
-                    prompt = generate_prompt(chunk)
-                    response_text, error = call_claude_api(prompt)
-                    if error:
-                        st.error(f"API error on chunk {ci+1}, call {call_idx+1}: {error}")
-                        continue
-                    parsed = parse_question_json(response_text)
-                    valid, invalid = filter_invalid_difficulty_alignment(parsed)
+    for ci, chunk in enumerate(chunks_to_use):
+        # --- First call (used immediately) ---
+        prompt = generate_prompt(chunk)
+        response_text, error = call_claude_api(prompt)
+        if error:
+            st.error(f"API error on chunk {ci+1}, initial call: {error}")
+            continue
+        parsed = parse_question_json(response_text)
+        valid, invalid = filter_invalid_difficulty_alignment(parsed)
 
-                # First call of first chunk = start quiz immediately
-                    if ci == 0 and call_idx == 0:
-                        first_batch.extend(valid)
-                    else:
-                        if "pending_batches" not in st.session_state:
-                            st.session_state.pending_batches = []
-                        st.session_state.pending_batches.append(valid)
+        # First chunk → seed first batch
+        if ci == 0:
+            first_batch.extend(valid)
+        else:
+            if "pending_batches" not in st.session_state:
+                st.session_state.pending_batches = []
+            st.session_state.pending_batches.append(valid)
 
-            if first_batch:
-                st.session_state.all_questions = first_batch
-                st.session_state.questions_by_difficulty = group_by_difficulty(first_batch)
-                st.session_state.quiz_state = {
-                "current_difficulty": 4,
-                "asked": set(),
-                "answers": [],
-                "quiz_end": False,
-                "current_q_idx": None,
-                "current_q": None,
-                "show_explanation": False,
-                "last_correct": None,
-                "last_explanation": None,
-            }
-                st.success("✅ First batch ready! Starting the quiz...")
-                st.session_state.quiz_ready = True
-                st.rerun()
-            else:
-                st.error("No questions were generated in the first batch.")
+        # --- Extra calls (queued for background) ---
+        for extra_call in range(2):  # two additional calls
+            if "pending_batches" not in st.session_state:
+                st.session_state.pending_batches = []
+            st.session_state.pending_batches.append((chunk, f"chunk {ci+1} extra {extra_call+1}"))
+
+    # process pending_batches tuples into actual questions
+    # background loader later should handle both pre-parsed valid lists
+    # and (chunk, label) tuples by re-calling call_claude_api on demand
+
+    if first_batch:
+        st.session_state.all_questions = first_batch
+        st.session_state.questions_by_difficulty = group_by_difficulty(first_batch)
+        st.session_state.quiz_state = {
+            "current_difficulty": 4,
+            "asked": set(),
+            "answers": [],
+            "quiz_end": False,
+            "current_q_idx": None,
+            "current_q": None,
+            "show_explanation": False,
+            "last_correct": None,
+            "last_explanation": None,
+        }
+        st.success("✅ First batch ready! Starting the quiz...")
+        st.session_state.quiz_ready = True
+        st.rerun()
+    else:
+        st.error("No questions were generated in the first batch.")
+
 
 
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
@@ -618,6 +629,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             file_name="ascendquiz_questions.csv",
             mime="text/csv"
             )
+
 
 
 
