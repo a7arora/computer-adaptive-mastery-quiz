@@ -5,8 +5,6 @@ import requests
 import json
 import re
 import random
-import time
-from typing import List, Dict, Tuple, Optional
 
 API_KEY = st.secrets["ANTHROPIC_API_KEY"]
 
@@ -19,26 +17,14 @@ CLAUDE_URL = "https://api.anthropic.com/v1/messages"
 MODEL_NAME = "claude-sonnet-4-20250514"
 
 def extract_text_from_pdf(pdf_file):
-    """Extract text from PDF with error handling"""
-    try:
-        doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-        pages = []
-        for page in doc:
-            text = page.get_text()
-            if text.strip():  # Only include non-empty pages
-                pages.append(text)
-        doc.close()
-        return pages
-    except Exception as e:
-        st.error(f"Error extracting text from PDF: {str(e)}")
-        return []
+    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+    return [page.get_text() for page in doc if page.get_text().strip()]
 
 def generate_prompt(text_chunk):
     return f"""
 You are a teacher who is designing a test with multiple choice questions (each with 4 answer choices) to test content from a passage.
 
-Given the following passage or notes, generate exactly 8 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 8 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
-
+Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
 **CRITICAL REQUIREMENT - NO TEXT REFERENCES:**
 - Questions must be COMPLETELY SELF-CONTAINED and not reference the original text
 - DO NOT use phrases like "according to the passage," "the text states," "the first example," "as mentioned," "the author discusses," etc.
@@ -57,7 +43,7 @@ Given the following passage or notes, generate exactly 8 multiple choice questio
 ✅ "What happens when you use correlated features in a Random Forest model?"
 
 **Requirements**:
-- 2 easy (>=85%), 2 medium (60–84%), 2 medium-hard (40-60%), 2 hard(<40%).(These are the percentages of students are expected to get correctly on a multiple choiced assessment testing this content)
+- 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard(<40%)
 You tend to make the questions easier than the respective labels(for instance, you make hard questions that 60% of students answer correctly or medium-hard questions that 70% of students answer correctly), so please try to make the questions more significantly more challenging than you would think they should be for medium-hard and hard questions
 
 **Each question must include the following fields:**
@@ -83,7 +69,7 @@ You tend to make the questions easier than the respective labels(for instance, y
 
 All math expressions must use valid LaTeX format with $...$ for inline math and $$...$$ for display math.
 
-Return a valid JSON list of 8 questions. Focus on testing conceptual understanding rather than text memorization.
+Return a valid JSON list of 20 questions. Focus on testing conceptual understanding rather than text memorization.
 
 If the passage contains code or table output, generate questions about how the code works and what outputs mean - but present these as general programming/analysis questions, not as references to "the code shown" or "the table above."
 
@@ -91,58 +77,21 @@ Passage:
 {text_chunk}
 """
 
-def call_claude_api(prompt: str, max_retries: int = 3, base_delay: float = 2.0) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Call Claude API with exponential backoff retry logic
-    """
+def call_claude_api(prompt):
     data = {
         "model": MODEL_NAME,
-        "max_tokens": 2000,
+        "max_tokens": 4500,
         "temperature": 0.7,
         "system": "You are a helpful educational assistant.",
         "messages": [
             {"role": "user", "content": prompt}
         ]
     }
-    
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(CLAUDE_URL, headers=headers, json=data, timeout=80)
-            
-            if response.status_code == 200:
-                return response.json()["content"][0]["text"], None
-            elif response.status_code == 529:  # Overloaded
-                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
-                st.warning(f"API overloaded. Retrying in {delay:.1f} seconds... (Attempt {attempt + 1}/{max_retries})")
-                time.sleep(delay)
-                continue
-            elif response.status_code == 500:  # Internal server error
-                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
-                st.warning(f"Internal server error. Retrying in {delay:.1f} seconds... (Attempt {attempt + 1}/{max_retries})")
-                time.sleep(delay)
-                continue
-            else:
-                error_msg = f"HTTP {response.status_code}: {response.text}"
-                if attempt == max_retries - 1:
-                    return None, error_msg
-                st.warning(f"API error (attempt {attempt + 1}/{max_retries}): {error_msg}")
-                time.sleep(base_delay * (2 ** attempt))
-                continue
-                
-        except requests.exceptions.Timeout:
-            if attempt == max_retries - 1:
-                return None, "Request timeout"
-            st.warning(f"Request timeout. Retrying... (Attempt {attempt + 1}/{max_retries})")
-            time.sleep(base_delay * (2 ** attempt))
-            continue
-        except requests.exceptions.RequestException as e:
-            if attempt == max_retries - 1:
-                return None, f"Request error: {str(e)}"
-            st.warning(f"Request error. Retrying... (Attempt {attempt + 1}/{max_retries})")
-            time.sleep(base_delay * (2 ** attempt))
-            continue
-    
-    return None, "Max retries exceeded"
+    response = requests.post(CLAUDE_URL, headers=headers, json=data)
+    if response.status_code != 200:
+        return None, response.text
+    return response.json()["content"][0]["text"], None
+
 
 def clean_response_text(text: str) -> str:
     """
@@ -158,7 +107,7 @@ def clean_response_text(text: str) -> str:
         r"`{3,}\s*json\s*(.*?)`{3,}",  # Multiple backticks with json
         r"`{3,}\s*(.*?)`{3,}"   # Multiple backticks without json
     ]
-    
+
     for pattern in fence_patterns:
         fence_match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
         if fence_match:
@@ -169,7 +118,7 @@ def clean_response_text(text: str) -> str:
     # Look for the first '[' and last ']'
     start_idx = text.find('[')
     end_idx = text.rfind(']')
-    
+
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         text = text[start_idx:end_idx + 1]
         return text.strip()
@@ -177,12 +126,13 @@ def clean_response_text(text: str) -> str:
     # Fallback: look for object boundaries
     start_idx = text.find('{')
     end_idx = text.rfind('}')
-    
+
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         text = text[start_idx:end_idx + 1]
         return text.strip()
 
     return text
+
 
 def repair_json(text: str) -> str:
     """
@@ -201,8 +151,9 @@ def repair_json(text: str) -> str:
     text = re.sub(r'(\d+)\s*%', r'\1', text)
 
     # Fix unescaped quotes in strings (more conservative approach)
+    # This is a simplified fix - for more complex cases, you might need a proper JSON parser
     text = re.sub(r'(?<!\\)"([^"]*?)(?<!\\)"(?=\s*[,\]}])', lambda m: '"' + m.group(1).replace('"', '\\"') + '"', text)
-    
+
     # Ensure the text starts with [ if it looks like an array
     text = text.strip()
     if not text.startswith('[') and not text.startswith('{'):
@@ -210,62 +161,72 @@ def repair_json(text: str) -> str:
         json_start = re.search(r'[\[{]', text)
         if json_start:
             text = text[json_start.start():]
-    
+
     return text
 
-def parse_question_json(text: str) -> List[Dict]:
+
+def parse_question_json(text: str):
     """
     Parse JSON with better error handling and debugging
     """
-    if not text:
-        return []
-    
+    # Print raw text for debugging
+    print(f"Raw API response length: {len(text)}")
+    print(f"Raw API response (first 200 chars): {text[:200]}")
+
     cleaned = clean_response_text(text)
+    print(f"Cleaned text length: {len(cleaned)}")
+    print(f"Cleaned text (first 200 chars): {cleaned[:200]}")
+
     cleaned = repair_json(cleaned)
+    print(f"Repaired text (first 200 chars): {cleaned[:200]}")
 
     # Try standard JSON parsing first
     try:
         result = json.loads(cleaned)
-        if isinstance(result, list):
-            return result
-        elif isinstance(result, dict):
-            return [result]
-        else:
-            return []
+        print(f"Successfully parsed {len(result) if isinstance(result, list) else 1} questions")
+        return result
     except json.JSONDecodeError as e:
+        print(f"Standard JSON parsing failed: {e}")
+
         # Try json5 as fallback (more lenient parsing)
         try:
             import json5
             result = json5.loads(cleaned)
-            if isinstance(result, list):
-                return result
-            elif isinstance(result, dict):
-                return [result]
-            else:
-                return []
-        except Exception:
+            print(f"JSON5 parsing successful: {len(result) if isinstance(result, list) else 1} questions")
+            return result
+        except Exception as e2:
+            print(f"JSON5 parsing also failed: {e2}")
+
             # Final fallback: try to extract individual questions manually
             try:
-                questions = []
                 # Look for question objects and try to parse them individually
+                questions = []
+                # Split by question boundaries and try to parse each
                 question_pattern = r'\{\s*"question":[^}]*?"reasoning":[^}]*?\}'
                 potential_questions = re.findall(question_pattern, cleaned, re.DOTALL)
-                
+
                 for q_text in potential_questions:
                     try:
                         q_obj = json.loads(q_text)
                         questions.append(q_obj)
                     except:
                         continue
-                
-                return questions
-            except:
-                st.error(f"JSON parsing failed completely. Error: {str(e)}")
-                st.text(f"Cleaned text (first 500 chars): {cleaned[:500]}")
-                return []
 
-def filter_invalid_difficulty_alignment(questions: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
-    """Filter questions based on Bloom's taxonomy difficulty alignment"""
+                if questions:
+                    print(f"Manual extraction successful: {len(questions)} questions")
+                    return questions
+            except:
+                pass
+
+            # Log the error with more context
+            st.error("⚠️ JSON parse failed:")
+            st.error(f"Standard JSON error: {e}")
+            st.error(f"JSON5 error: {e2}")
+            st.text("Raw cleaned text (first 1000 chars):")
+            st.text(cleaned[:1000])
+
+            return []
+def filter_invalid_difficulty_alignment(questions):
     bloom_difficulty_ranges = {
         "Remember": (70, 100),
         "Understand": (50, 85),
@@ -279,21 +240,14 @@ def filter_invalid_difficulty_alignment(questions: List[Dict]) -> Tuple[List[Dic
     invalid = []
 
     for q in questions:
-        if not isinstance(q, dict):
-            invalid.append(q)
-            continue
-
-        # Validate required fields
-        required_fields = ["question", "options", "correct_answer", "explanation", 
-                          "cognitive_level", "estimated_correct_pct", "reasoning"]
-        if not all(field in q for field in required_fields):
+        if not isinstance(q, dict):  # skip anything not a dict
             invalid.append(q)
             continue
 
         cog = str(q.get("cognitive_level", "")).strip().capitalize()
         try:
             pct = int(q.get("estimated_correct_pct", -1))
-        except (ValueError, TypeError):
+        except Exception:
             pct = -1
 
         if cog in bloom_difficulty_ranges and 0 <= pct <= 100:
@@ -307,13 +261,11 @@ def filter_invalid_difficulty_alignment(questions: List[Dict]) -> Tuple[List[Dic
 
     return valid, invalid
 
-def assign_difficulty_label(estimated_pct: int) -> Optional[int]:
-    """Assign difficulty label based on estimated correctness percentage"""
+def assign_difficulty_label(estimated_pct):
     try:
         pct = int(estimated_pct)
-    except (ValueError, TypeError):
+    except:
         return None
-    
     if pct < 30: return 8
     elif pct < 40: return 7
     elif pct < 50: return 6
@@ -323,8 +275,7 @@ def assign_difficulty_label(estimated_pct: int) -> Optional[int]:
     elif pct < 90: return 2
     else: return 1
 
-def group_by_difficulty(questions: List[Dict]) -> Dict[int, List[Dict]]:
-    """Group questions by difficulty level"""
+def group_by_difficulty(questions):
     groups = {i: [] for i in range(1, 9)}
     for q in questions:
         pct = q.get("estimated_correct_pct", 0)
@@ -334,20 +285,16 @@ def group_by_difficulty(questions: List[Dict]) -> Dict[int, List[Dict]]:
             groups[label].append(q)
     return groups
 
-def pick_question(diff: int, asked: set, all_qs: Dict[int, List[Dict]]) -> List[Tuple[int, Dict]]:
-    """Pick available questions from a difficulty level"""
+def pick_question(diff, asked, all_qs):
     pool = all_qs.get(diff, [])
     return [(i, q) for i, q in enumerate(pool) if (diff, i) not in asked]
 
-def find_next_difficulty(current_diff: int, going_up: bool, asked: set, all_qs: Dict[int, List[Dict]]) -> int:
-    """Find next available difficulty level"""
+def find_next_difficulty(current_diff, going_up, asked, all_qs):
     next_diff = current_diff + 1 if going_up else current_diff - 1
 
     # Try one step in intended direction
     if 1 <= next_diff <= 8 and pick_question(next_diff, asked, all_qs):
         return next_diff
-    
-    # Search further in the intended direction
     search_range = (
         range(next_diff + 1, 9) if going_up else range(next_diff - 1, 0, -1)
     )
@@ -355,22 +302,18 @@ def find_next_difficulty(current_diff: int, going_up: bool, asked: set, all_qs: 
         if pick_question(d, asked, all_qs):
             return d
     return current_diff
-
-def get_next_question(current_diff: int, asked: set, all_qs: Dict[int, List[Dict]]) -> Tuple[int, Optional[int], Optional[Dict]]:
-    """Get the next question to ask"""
+def get_next_question(current_diff, asked, all_qs):
     available = pick_question(current_diff, asked, all_qs)
     if not available:
         return current_diff, None, None
     idx, q = random.choice(available)
     return current_diff, idx, q
 
-def accuracy_on_levels(answers: List[Tuple[int, bool]], levels: List[int]) -> float:
-    """Calculate accuracy on specific difficulty levels"""
+def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
-
-def compute_mastery_score(answers: List[Tuple[int, bool]]) -> int:
-    """Compute mastery score based on performance across difficulty levels"""
+def compute_mastery_score(answers):
+    #limits mastery scores based on difficulty attempted
     mastery_bands = {
         (1, 2): 25,
         (3, 4): 65,
@@ -387,8 +330,7 @@ def compute_mastery_score(answers: List[Tuple[int, bool]]) -> int:
 
         if attempts == 0:
             continue  
-        
-        # Normalize for guessing (25% baseline for multiple choice)
+        #does not give mastery points for guessing, especially on hard questions
         acc = sum(relevant) / attempts
         normalized_score = max((acc - 0.25) / 0.75, 0) 
 
@@ -404,13 +346,14 @@ def compute_mastery_score(answers: List[Tuple[int, bool]]) -> int:
 
     return int(round(max(band_scores)))
 
-def render_mastery_bar(score: int):
-    """Render the mastery progress bar"""
+#app frontend
+st.title("AscendQuiz")
+def render_mastery_bar(score):
     if score < 30:
         color = "red"
         text_color = "white"
     elif score < 70:
-        color = "yellow" 
+        color = "yellow"
         text_color = "black"
     else:
         color = "green"
@@ -457,16 +400,9 @@ def render_mastery_bar(score: int):
     </div>
     <div class="spacer"></div>
     """, unsafe_allow_html=True)
+score = compute_mastery_score(st.session_state.get("quiz_state", {}).get("answers", []))
+render_mastery_bar(score)
 
-# Main Streamlit App
-st.title("AscendQuiz")
-
-# Render mastery bar if quiz is active
-if "quiz_state" in st.session_state:
-    score = compute_mastery_score(st.session_state.quiz_state.get("answers", []))
-    render_mastery_bar(score)
-
-# Initialize session state
 if "all_questions" not in st.session_state:
     st.markdown("""
 Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
@@ -479,123 +415,79 @@ The quiz adapts in real-time based on your performance. Starting at a medium lev
 Each question includes:
 - Four answer options
 - The correct answer
-- An explanation  
+- An explanation
 - A predicted correctness percentage
 
 Unlike static tools like Khanmigo, this app uses generative AI to dynamically create the quiz from **your own content** — no rigid question banks required.
 
 ---
 
-**Built using the Claude-4 Sonnet model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. 
-
-**⚠️ Note:** Question generation takes 4-5 minutes. Please be patient. The app only processes text content and cannot read handwriting or drawings.
+**Built using the Claude-4 Sonnet model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. Please keep in mind that it currently takes about 4-5 minutes to generate questions from a pdf... please be patient as it generates questions. Furthermore, it only accepts text output and cannot read handwriting or drawings at this time.
 
 ---
 """)
 
+
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
-    
     if uploaded_pdf:
-        with st.spinner("Extracting text from PDF..."):
+        with st.spinner("Generating questions..."):
             chunks = extract_text_from_pdf(uploaded_pdf)
-        
-        if not chunks:
-            st.error("No text could be extracted from the PDF. Please ensure it contains readable text.")
-            st.stop()
-        
-        st.success(f"✅ Extracted text from {len(chunks)} pages")
-        
-        with st.spinner("Generating questions... This may take 4-5 minutes."):
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
             # Adaptive chunking
             if len(chunks) <= 2:
-                grouped_chunks = ["\n\n".join(chunks)]  
+                grouped_chunks = ["\n\n".join(chunks)]  # Treat as one full chunk
             else:
-                grouped_chunks = ["\n\n".join(chunks[i:i+3]) for i in range(0, len(chunks), 3)]
+                grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
 
             all_questions = []
-            total_chunks = min(4, len(grouped_chunks))  # still cap at 4
-            first_chunk, *rest_chunks = grouped_chunks[:total_chunks]
+            # Pick first 2 chunks or duplicate the first if only one exists
+            chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
 
-            # Process first chunk immediately
-            status_text.text("Processing first chunk...")
-            progress_bar.progress(0.3)
-
-            prompt = generate_prompt(first_chunk)
-            response_text, error = call_claude_api(prompt)
-
-            if error:
-                st.error(f"❌ Failed to generate questions for first chunk: {error}")
-            else:
+            for chunk in chunks_to_use:
+                prompt = generate_prompt(chunk)
+                response_text, error = call_claude_api(prompt)
+                if error:
+                    st.error("API error: " + error)
+                    continue
                 parsed = parse_question_json(response_text)
                 valid, invalid = filter_invalid_difficulty_alignment(parsed)
-
-                if valid:
-                    all_questions.extend(valid)
-                    st.success(f"✅ Generated {len(valid)} valid questions from first chunk")
-                else:
-                    st.warning("⚠️ No valid questions from first chunk")
-
-                if invalid:
-                    st.warning(f"⚠️ {len(invalid)} questions filtered out from first chunk")
-            # Save remaining chunks for background loading
-            st.session_state.pending_batches = rest_chunks
-
-        
-        if all_questions:
-            st.session_state.all_questions = all_questions
-            st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
-            st.session_state.quiz_state = {
-        "current_difficulty": 4,
-        "asked": set(),
-        "answers": [],
-        "quiz_end": False,
-        "current_q_idx": None,
-        "current_q": None,
-        "show_explanation": False,
-        "last_correct": None,
-        "last_explanation": None,
-    }
-            st.session_state.quiz_ready = True
-            st.rerun()
-    else:
-        st.error("❌ Could not generate any valid questions from the first chunk.")
+                all_questions.extend(valid)
+                if "filtered_questions" not in st.session_state:
+                    st.session_state.filtered_questions = []
+                st.session_state.filtered_questions.extend(invalid)
+            if all_questions:
+                st.session_state.all_questions = all_questions
+                st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
+                st.session_state.quiz_state = {
+                    "current_difficulty": 4,
+                    "asked": set(),
+                    "answers": [],
+                    "quiz_end": False,
+                    "current_q_idx": None,
+                    "current_q": None,
+                    "show_explanation": False,
+                    "last_correct": None,
+                    "last_explanation": None,
+                }
+                st.success("✅ Questions generated! Starting the quiz...")
+                st.session_state.quiz_ready = True
+                st.rerun()
+            else:
+                st.error("No questions were generated.")
 
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
-    # Background loading of pending batches
-    if "pending_batches" in st.session_state and st.session_state.pending_batches:
-        next_chunk = st.session_state.pending_batches.pop(0)
-        with st.spinner("Loading more questions in background..."):
-            response_text, error = call_claude_api(generate_prompt(next_chunk))
-            if not error:
-                parsed = parse_question_json(response_text)
-                valid, invalid = filter_invalid_difficulty_alignment(parsed)
-                if valid:
-                    st.session_state.all_questions.extend(valid)
-                    grouped = group_by_difficulty(valid)
-                    for d, qs in grouped.items():
-                        st.session_state.questions_by_difficulty[d].extend(qs)
-                if invalid:
-                    st.warning(f"⚠️ {len(invalid)} questions filtered out from background batch")
-
     all_qs = st.session_state.questions_by_difficulty
     state = st.session_state.get("quiz_state", None)
 
     if state is None:
         st.warning("Quiz state not found. Please restart the app or re-upload a PDF.")
         st.stop()
-
     score = compute_mastery_score(state.get("answers", []))
-    
+    render_mastery_bar(score)
     if not state["quiz_end"]:
-        # Get next question if we don't have one
         if state["current_q"] is None and not state.get("show_explanation", False):
             diff, idx, q = get_next_question(state["current_difficulty"], state["asked"], all_qs)
             if q is None:
                 state["quiz_end"] = True
-                st.rerun()
             else:
                 state["current_q"] = q
                 state["current_q_idx"] = idx
@@ -605,30 +497,27 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         q = state["current_q"]
         idx = state["current_q_idx"]
 
-        st.markdown(f"### Question (Difficulty Level {state['current_difficulty']})")
+        st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
         st.markdown(q["question"], unsafe_allow_html=True)
-        
         def strip_leading_label(text):
+            # Removes A), A., A:, A - etc.
             return re.sub(r"^[A-Da-d][\).:\-]?\s+", "", text).strip()
 
         option_labels = ["A", "B", "C", "D"]
-        cleaned_options = [strip_leading_label(str(opt)) for opt in q["options"]]
+        cleaned_options = [strip_leading_label(opt) for opt in q["options"]]
         rendered_options = []
-        
         for label, text in zip(option_labels, cleaned_options):
+            # Wrap LaTeX content in markdown with inline math if any '$' is present
             if "$" in text or "\\" in text:
-                rendered_text = f"{label}. {text}"
+                rendered_text = f"{label}. $${text}$$"
             else:
                 rendered_text = f"{label}. {text}"
             rendered_options.append(rendered_text)
 
         selected = st.radio("Select your answer:", options=rendered_options, key=f"radio_{idx}", index=None)
 
+
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
-            if selected is None:
-                st.warning("Please select an answer before submitting.")
-                st.stop()
-                
             selected_letter = selected.split(".")[0].strip().upper()
             letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
             correct_letter = q["correct_answer"].strip().upper()
@@ -648,33 +537,37 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             state["last_explanation"] = q["explanation"]
             state["show_explanation"] = True
 
-            # Update mastery score
+            # Update mastery score according to quiz question
             score = compute_mastery_score(state["answers"])
+            #end when students reach mastery at 70/100
             if score >= 70:
                 state["quiz_end"] = True
-
-            st.rerun()
 
         if state.get("show_explanation", False):
             if state["last_correct"]:
                 st.success("✅ Correct!")
             else:
-                st.error("❌ Incorrect.")
-            
-            st.markdown("**Explanation:**")
-            st.markdown(state["last_explanation"], unsafe_allow_html=True)
+                st.markdown("❌ **Incorrect.**", unsafe_allow_html=True)
+                st.markdown(state["last_explanation"], unsafe_allow_html=True)
 
             if st.button("Next Question"):
-                # Adjust difficulty based on performance
+                # Adjust difficulty
+                def find_next_difficulty(current_diff, going_up, asked, all_qs):
+                    diffs = range(current_diff + 1, 9) if going_up else range(current_diff - 1, 0, -1)
+                    for d in diffs:
+                        if pick_question(d, asked, all_qs):
+                            return d
+                    return current_diff  # fallback to current if no higher/lower available
+
+                # Adjust difficulty based on performance, scaffolding learning and challenging students
                 if state["last_correct"]:
                     state["current_difficulty"] = find_next_difficulty(
-                        state["current_difficulty"], going_up=True, asked=state["asked"], all_qs=all_qs
+                    state["current_difficulty"], going_up=True, asked=state["asked"], all_qs=all_qs
                     )
                 else:
                     state["current_difficulty"] = find_next_difficulty(
-                        state["current_difficulty"], going_up=False, asked=state["asked"], all_qs=all_qs
+                    state["current_difficulty"], going_up=False, asked=state["asked"], all_qs=all_qs
                     )
-                
                 # Clear current question to trigger fetching a new one
                 state["current_q"] = None
                 state["current_q_idx"] = None
@@ -684,41 +577,25 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 st.rerun()
 
     elif state["quiz_end"]:
+        acc = accuracy_on_levels(state["answers"], [5, 6, 7, 8])
+        hard_attempts = len([1 for d, _ in state["answers"] if d >= 5])
         st.markdown("## Quiz Completed 🎉")
-        
         if score >= 70:
-            st.success(f"🎉 **Mastery Achieved!** Your mastery score is {score}%. Excellent work!")
+            st.success(f"🎉 You have mastered the content! Your mastery score is {score}%. Great job!")
         else:
             st.warning(f"Mastery not yet achieved. Your mastery score is {score}%. Review the material and try again.")
 
-        # Show performance summary
-        total_questions = len(state["answers"])
-        correct_answers = sum(1 for _, correct in state["answers"] if correct)
-        overall_accuracy = (correct_answers / total_questions * 100) if total_questions > 0 else 0
-        
-        st.markdown(f"""
-        ### Performance Summary
-        - **Questions Answered:** {total_questions}
-        - **Overall Accuracy:** {overall_accuracy:.1f}%
-        - **Mastery Score:** {score}%
-        """)
-
-        # Download questions
         if "all_questions" in st.session_state:
+            all_qs_json = json.dumps(st.session_state.all_questions, indent=2)
             df = pd.DataFrame(st.session_state.all_questions)
             csv_data = df.to_csv(index=False)
             st.download_button(
-                label="📥 Download All Quiz Questions (CSV)",
-                data=csv_data,
-                file_name="ascendquiz_questions.csv",
-                mime="text/csv"
+                label="📥 Download All Quiz Questions (JSON)",
+                data=all_qs_json,
+                file_name="ascendquiz_questions.json",
+                mime="application/json"
+            label="📥 Download All Quiz Questions (CSV)",
+            data=csv_data,
+            file_name="ascendquiz_questions.csv",
+            mime="text/csv"
             )
-
-        # Restart button
-        if st.button("🔄 Start New Quiz"):
-            # Clear session state to restart
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
-
-
