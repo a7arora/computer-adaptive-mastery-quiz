@@ -593,9 +593,10 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 label="📥 Download All Quiz Questions (JSON)",
                 data=all_qs_json,
                 file_name="ascendquiz_questions.json",
-                mime="application/json"
+                mime="application/json",
             label="📥 Download All Quiz Questions (CSV)",
             data=csv_data,
             file_name="ascendquiz_questions.csv",
             mime="text/csv"
             )
+
