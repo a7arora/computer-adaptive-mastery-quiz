@@ -533,7 +533,6 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         st.stop()
 
     score = compute_mastery_score(state.get("answers", []))
-    render_mastery_bar(score)
     
     if not state["quiz_end"]:
         if state["current_q"] is None and not state.get("show_explanation", False):
@@ -640,5 +639,6 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.csv",
                 mime="text/csv"
             )
+
 
 
