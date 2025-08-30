@@ -97,7 +97,7 @@ def call_claude_api(prompt: str, max_retries: int = 3, base_delay: float = 2.0) 
     """
     data = {
         "model": MODEL_NAME,
-        "max_tokens": 4500,
+        "max_tokens": 2000,
         "temperature": 0.7,
         "system": "You are a helpful educational assistant.",
         "messages": [
@@ -107,7 +107,7 @@ def call_claude_api(prompt: str, max_retries: int = 3, base_delay: float = 2.0) 
     
     for attempt in range(max_retries):
         try:
-            response = requests.post(CLAUDE_URL, headers=headers, json=data, timeout=60)
+            response = requests.post(CLAUDE_URL, headers=headers, json=data, timeout=80)
             
             if response.status_code == 200:
                 return response.json()["content"][0]["text"], None
@@ -720,4 +720,5 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             st.rerun()
+
 
