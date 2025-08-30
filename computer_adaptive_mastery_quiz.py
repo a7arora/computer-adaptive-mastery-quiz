@@ -400,7 +400,7 @@ def render_mastery_bar(score):
     if score < 30:
         color = "red"
         text_color = "white"
-    elif score < 70:
+    elif score < 50:
         color = "yellow"
         text_color = "black"
     else:
@@ -461,7 +461,7 @@ Welcome to your personalized learning assistant — an AI-powered tool that tran
 **How it works:**
 This app uses a large language model (LLM) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
 
-The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once your **mastery score reaches 70% or higher** (calculated using your accuracy weighted by difficulty level), the system considers you to have achieved **mastery** and ends the quiz.
+The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once your **mastery score reaches 50% or higher** (calculated using your accuracy weighted by difficulty level), the system considers you to have achieved **mastery** and ends the quiz.
 
 Each question includes:
 - Four answer options
@@ -592,7 +592,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
             # Update mastery score
             score = compute_mastery_score(state["answers"])
-            if score >= 70:
+            if score >= 50:
                 state["quiz_end"] = True
 
         if state.get("show_explanation", False):
@@ -625,7 +625,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
     elif state["quiz_end"]:
         st.markdown("## Quiz Completed 🎉")
-        if score >= 70:
+        if score >= 50:
             st.success(f"🎉 You have mastered the content! Your mastery score is {score}%. Great job!")
         else:
             st.warning(f"Mastery not yet achieved. Your mastery score is {score}%. Review the material and try again.")
@@ -639,6 +639,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.csv",
                 mime="text/csv"
             )
+
 
 
 
