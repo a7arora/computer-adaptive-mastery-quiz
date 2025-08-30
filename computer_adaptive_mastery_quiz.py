@@ -118,7 +118,7 @@ def call_claude_api(prompt, api_key, call_id):
     headers = get_headers(api_key)
     data = {
         "model": MODEL_NAME,
-        "max_tokens": 4500,
+        "max_tokens": 2600,
         "temperature": 0.7,
         "system": "You are a helpful educational assistant. Always return properly formatted JSON arrays without any additional text or markdown formatting.",
         "messages": [
@@ -702,3 +702,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.csv",
                 mime="text/csv"
             )
+
