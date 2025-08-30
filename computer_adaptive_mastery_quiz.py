@@ -6,7 +6,7 @@ import json
 import re
 import random
 
-API_KEY = st.secrets["ANTHROPIC_API_KEY"]
+API_KEY = st.secrets["ANTHROPIC_API_KEY_1"]
 
 headers = {
     "x-api-key": f"{API_KEY}",
@@ -639,6 +639,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.csv",
                 mime="text/csv"
             )
+
 
 
 
