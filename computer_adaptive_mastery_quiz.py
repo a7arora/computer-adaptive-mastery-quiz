@@ -24,7 +24,7 @@ def generate_prompt(text_chunk):
     return f"""
 You are a teacher who is designing a test with multiple choice questions (each with 4 answer choices) to test content from a passage.
 
-Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
+Given the following passage or notes, generate exactly 8 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
 **CRITICAL REQUIREMENT - NO TEXT REFERENCES:**
 - Questions must be COMPLETELY SELF-CONTAINED and not reference the original text
 - DO NOT use phrases like "according to the passage," "the text states," "the first example," "as mentioned," "the author discusses," etc.
@@ -43,7 +43,7 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
 ✅ "What happens when you use correlated features in a Random Forest model?"
 
 **Requirements**:
-- 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard(<40%)
+- 2 easy (>=85%), 2 medium (60–84%), 2 medium-hard (40-60%), 2 hard(<40%).(These are the percentages of students are expected to get correctly on a multiple choiced assessment testing this content)
 You tend to make the questions easier than the respective labels(for instance, you make hard questions that 60% of students answer correctly or medium-hard questions that 70% of students answer correctly), so please try to make the questions more significantly more challenging than you would think they should be for medium-hard and hard questions
 
 **Each question must include the following fields:**
@@ -430,49 +430,59 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
-        with st.spinner("Generating questions..."):
+        with st.spinner("Generating first batch of questions..."):
             chunks = extract_text_from_pdf(uploaded_pdf)
-            # Adaptive chunking
+
+        # Adaptive chunking (same as before)
             if len(chunks) <= 2:
-                grouped_chunks = ["\n\n".join(chunks)]  # Treat as one full chunk
+                grouped_chunks = ["\n\n".join(chunks)]  
             else:
                 grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
 
             all_questions = []
-            # Pick first 2 chunks or duplicate the first if only one exists
+            first_batch = []
+
+        # Pick first 2 chunks (like before) OR duplicate if only 1
             chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
 
-            for chunk in chunks_to_use:
-                prompt = generate_prompt(chunk)
-                response_text, error = call_claude_api(prompt)
-                if error:
-                    st.error("API error: " + error)
-                    continue
-                parsed = parse_question_json(response_text)
-                valid, invalid = filter_invalid_difficulty_alignment(parsed)
-                all_questions.extend(valid)
-                if "filtered_questions" not in st.session_state:
-                    st.session_state.filtered_questions = []
-                st.session_state.filtered_questions.extend(invalid)
-            if all_questions:
-                st.session_state.all_questions = all_questions
-                st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
+            for ci, chunk in enumerate(chunks_to_use):
+                for call_idx in range(3):  # 3 calls per chunk
+                    prompt = generate_prompt(chunk)
+                    response_text, error = call_claude_api(prompt)
+                    if error:
+                        st.error(f"API error on chunk {ci+1}, call {call_idx+1}: {error}")
+                        continue
+                    parsed = parse_question_json(response_text)
+                    valid, invalid = filter_invalid_difficulty_alignment(parsed)
+
+                # First call of first chunk = start quiz immediately
+                    if ci == 0 and call_idx == 0:
+                        first_batch.extend(valid)
+                    else:
+                        if "pending_batches" not in st.session_state:
+                            st.session_state.pending_batches = []
+                        st.session_state.pending_batches.append(valid)
+
+            if first_batch:
+                st.session_state.all_questions = first_batch
+                st.session_state.questions_by_difficulty = group_by_difficulty(first_batch)
                 st.session_state.quiz_state = {
-                    "current_difficulty": 4,
-                    "asked": set(),
-                    "answers": [],
-                    "quiz_end": False,
-                    "current_q_idx": None,
-                    "current_q": None,
-                    "show_explanation": False,
-                    "last_correct": None,
-                    "last_explanation": None,
-                }
-                st.success("✅ Questions generated! Starting the quiz...")
+                "current_difficulty": 4,
+                "asked": set(),
+                "answers": [],
+                "quiz_end": False,
+                "current_q_idx": None,
+                "current_q": None,
+                "show_explanation": False,
+                "last_correct": None,
+                "last_explanation": None,
+            }
+                st.success("✅ First batch ready! Starting the quiz...")
                 st.session_state.quiz_ready = True
                 st.rerun()
             else:
-                st.error("No questions were generated.")
+                st.error("No questions were generated in the first batch.")
+
 
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
@@ -481,6 +491,20 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     if state is None:
         st.warning("Quiz state not found. Please restart the app or re-upload a PDF.")
         st.stop()
+
+    # --- 🔄 Background loader for pending batches ---
+    # While the user is answering questions, we sneak in more batches
+    if "pending_batches" in st.session_state and st.session_state.pending_batches:
+        # Only load one batch per rerun so we don't freeze the UI
+        next_batch = st.session_state.pending_batches.pop(0)
+
+        # Add these questions into the main pool
+        st.session_state.all_questions.extend(next_batch)
+
+        # Rebuild difficulty grouping with all questions
+        st.session_state.questions_by_difficulty = group_by_difficulty(st.session_state.all_questions)
+
+        st.info(f"📥 Loaded {len(next_batch)} more questions into the quiz in the background.")
     score = compute_mastery_score(state.get("answers", []))
     render_mastery_bar(score)
     if not state["quiz_end"]:
@@ -594,6 +618,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             file_name="ascendquiz_questions.csv",
             mime="text/csv"
             )
+
 
 
 
