@@ -5,16 +5,25 @@ import requests
 import json
 import re
 import random
+import concurrent.futures
+import threading
 
-API_KEY = st.secrets["ANTHROPIC_API_KEY"]
+# Get multiple API keys
+API_KEY_1 = st.secrets["ANTHROPIC_API_KEY_1"]
+API_KEY_2 = st.secrets["ANTHROPIC_API_KEY_2"]
+API_KEY_3 = st.secrets["ANTHROPIC_API_KEY_3"]
 
-headers = {
-    "x-api-key": f"{API_KEY}",
-    "anthropic-version": "2023-06-01",
-    "Content-Type": "application/json"
-}
+API_KEYS = [API_KEY_1, API_KEY_2, API_KEY_3]
+
 CLAUDE_URL = "https://api.anthropic.com/v1/messages"
 MODEL_NAME = "claude-sonnet-4-20250514"
+
+def get_headers(api_key):
+    return {
+        "x-api-key": f"{api_key}",
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json"
+    }
 
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
@@ -24,7 +33,13 @@ def generate_prompt(text_chunk):
     return f"""
 You are a teacher who is designing a test with multiple choice questions (each with 4 answer choices) to test content from a passage.
 
-Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
+Given the following passage or notes, generate exactly 12 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty with exactly:
+- 3 easy questions (≥85% expected correct rate)
+- 3 medium questions (60–84% expected correct rate)
+- 3 medium-hard questions (40-60% expected correct rate)
+- 3 hard questions (<40% expected correct rate)
+
+If there is not enough content to write 12 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
 
 **CRITICAL REQUIREMENT - NO TEXT REFERENCES:**
 - Questions must be COMPLETELY SELF-CONTAINED and not reference the original text
@@ -43,8 +58,6 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
 ✅ "In SAS programming, dates are stored as the number of days from which reference point?"
 ✅ "What happens when you use correlated features in a Random Forest model?"
 
-**Requirements**:
-- 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard(<40%)
 You tend to make the questions easier than the respective labels(for instance, you make hard questions that 60% of students answer correctly or medium-hard questions that 70% of students answer correctly), so please try to make the questions more significantly more challenging than you would think they should be for medium-hard and hard questions
 
 **CRITICAL JSON FORMAT REQUIREMENTS:**
@@ -92,7 +105,7 @@ Return ONLY a valid JSON array. Each question object must have this EXACT struct
 
 All math expressions must use valid LaTeX format with $...$ for inline math and $$...$$ for display math.
 
-Return ONLY a valid JSON array of 20 questions. Focus on testing conceptual understanding rather than text memorization.
+Return ONLY a valid JSON array of 12 questions. Focus on testing conceptual understanding rather than text memorization.
 
 If the passage contains code or table output, generate questions about how the code works and what outputs mean - but present these as general programming/analysis questions, not as references to "the code shown" or "the table above."
 
@@ -100,7 +113,9 @@ Passage:
 {text_chunk}
 """
 
-def call_claude_api(prompt):
+def call_claude_api(prompt, api_key, call_id):
+    """Make API call with specific API key and call identifier"""
+    headers = get_headers(api_key)
     data = {
         "model": MODEL_NAME,
         "max_tokens": 4500,
@@ -110,10 +125,37 @@ def call_claude_api(prompt):
             {"role": "user", "content": prompt}
         ]
     }
-    response = requests.post(CLAUDE_URL, headers=headers, json=data)
-    if response.status_code != 200:
-        return None, response.text
-    return response.json()["content"][0]["text"], None
+    
+    try:
+        response = requests.post(CLAUDE_URL, headers=headers, json=data)
+        if response.status_code != 200:
+            return None, f"API call {call_id} failed: {response.text}", call_id
+        return response.json()["content"][0]["text"], None, call_id
+    except Exception as e:
+        return None, f"API call {call_id} exception: {str(e)}", call_id
+
+def make_parallel_api_calls(text_chunk, api_keys):
+    """Make 3 parallel API calls using different API keys"""
+    prompt = generate_prompt(text_chunk)
+    
+    # Use ThreadPoolExecutor for parallel API calls
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        # Submit all API calls
+        future_to_call_id = {
+            executor.submit(call_claude_api, prompt, api_key, i+1): i+1 
+            for i, api_key in enumerate(api_keys)
+        }
+        
+        results = {}
+        for future in concurrent.futures.as_completed(future_to_call_id):
+            call_id = future_to_call_id[future]
+            try:
+                response_text, error, returned_call_id = future.result()
+                results[call_id] = (response_text, error)
+            except Exception as exc:
+                results[call_id] = (None, f'Call {call_id} generated an exception: {exc}')
+    
+    return results
 
 def clean_response_text(text: str) -> str:
     """
@@ -180,24 +222,24 @@ def repair_json(text: str) -> str:
     
     return text
 
-def parse_question_json(text: str):
+def parse_question_json(text: str, call_id: int):
     """
     Enhanced JSON parsing with better error handling.
     """
-    print(f"Raw API response length: {len(text)}")
-    print(f"Raw API response (first 500 chars): {text[:500]}")
+    print(f"API Call {call_id} - Raw response length: {len(text)}")
+    print(f"API Call {call_id} - Raw response (first 500 chars): {text[:500]}")
 
     cleaned = clean_response_text(text)
-    print(f"Cleaned text length: {len(cleaned)}")
+    print(f"API Call {call_id} - Cleaned text length: {len(cleaned)}")
     
     cleaned = repair_json(cleaned)
-    print(f"After repair (first 500 chars): {cleaned[:500]}")
+    print(f"API Call {call_id} - After repair (first 500 chars): {cleaned[:500]}")
 
     # Try standard JSON parsing
     try:
         result = json.loads(cleaned)
         if isinstance(result, list):
-            print(f"Successfully parsed {len(result)} questions")
+            print(f"API Call {call_id} - Successfully parsed {len(result)} questions")
             # Validate question structure
             valid_questions = []
             for i, q in enumerate(result):
@@ -205,24 +247,23 @@ def parse_question_json(text: str):
                     valid_questions.append(q)
             return valid_questions
         else:
-            print("Result is not a list")
+            print(f"API Call {call_id} - Result is not a list")
             return []
     except json.JSONDecodeError as e:
-        print(f"Standard JSON parsing failed: {e}")
-        print(f"Error at position: {e.pos}")
-        print(f"Context around error: {cleaned[max(0, e.pos-50):e.pos+50]}")
+        print(f"API Call {call_id} - Standard JSON parsing failed: {e}")
+        print(f"API Call {call_id} - Error at position: {e.pos}")
+        print(f"API Call {call_id} - Context around error: {cleaned[max(0, e.pos-50):e.pos+50]}")
         
         # Try to extract individual questions manually
         try:
             questions = extract_questions_manually(cleaned)
             if questions:
-                print(f"Manual extraction successful: {len(questions)} questions")
+                print(f"API Call {call_id} - Manual extraction successful: {len(questions)} questions")
                 return questions
         except Exception as e2:
-            print(f"Manual extraction failed: {e2}")
+            print(f"API Call {call_id} - Manual extraction failed: {e2}")
 
-        st.error("⚠️ JSON parsing failed. Please try uploading the PDF again.")
-        st.error(f"Error details: {str(e)}")
+        st.error(f"⚠️ JSON parsing failed for API call {call_id}. Continuing with other calls...")
         return []
 
 def validate_question_structure(question, index):
@@ -451,13 +492,12 @@ def render_mastery_bar(score):
  
 st.title("AscendQuiz")
 
-
 if "all_questions" not in st.session_state:
     st.markdown("""
 Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
 
 **How it works:**
-This app uses a large language model (LLM) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
+This app uses multiple large language models (LLMs) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. The system now makes 3 parallel API calls to generate 36 total questions (12 from each call), providing a richer question pool and faster generation.
 
 The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once your **mastery score reaches 50% or higher** (calculated using your accuracy weighted by difficulty level), the system considers you to have achieved **mastery** and ends the quiz.
 
@@ -471,58 +511,81 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
 
 ---
 
-**Built using the Claude-4 Sonnet model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. Please keep in mind that it currently takes about 4-5 minutes to generate questions from a pdf... please be patient as it generates questions. Furthermore, it only accepts text output and cannot read handwriting or drawings at this time.
+**Built using the Claude-4 Sonnet model with parallel processing**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. The parallel API calls now reduce generation time significantly. Furthermore, it only accepts text output and cannot read handwriting or drawings at this time.
 
 ---
 """)
 
 score = compute_mastery_score(st.session_state.get("quiz_state", {}).get("answers", []))
 render_mastery_bar(score) 
+
 uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
 if uploaded_pdf:
-        with st.spinner("Generating questions..."):
-            chunks = extract_text_from_pdf(uploaded_pdf)
-            # Adaptive chunking
-            if len(chunks) <= 2:
-                grouped_chunks = ["\n\n".join(chunks)]
-            else:
-                grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
-
-            all_questions = []
-            chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
-
-            for chunk in chunks_to_use:
-                prompt = generate_prompt(chunk)
-                response_text, error = call_claude_api(prompt)
-                if error:
-                    st.error("API error: " + error)
-                    continue
-                parsed = parse_question_json(response_text)
+    with st.spinner("Generating questions using parallel API calls..."):
+        chunks = extract_text_from_pdf(uploaded_pdf)
+        
+        # Use the first chunk or combine if too short
+        if len(chunks) <= 2:
+            text_chunk = "\n\n".join(chunks)
+        else:
+            text_chunk = "\n\n".join(chunks[:4])  # Use first 4 pages
+        
+        # Make 3 parallel API calls
+        st.info("Making 3 parallel API calls to generate 36 questions...")
+        api_results = make_parallel_api_calls(text_chunk, API_KEYS)
+        
+        # Process results from all API calls
+        all_questions = []
+        successful_calls = 0
+        failed_calls = 0
+        
+        for call_id in sorted(api_results.keys()):
+            response_text, error = api_results[call_id]
+            
+            if error:
+                st.error(f"API Call {call_id} failed: {error}")
+                failed_calls += 1
+                continue
+                
+            if response_text:
+                parsed = parse_question_json(response_text, call_id)
                 valid, invalid = filter_invalid_difficulty_alignment(parsed)
-                all_questions.extend(valid)
+                
+                if valid:
+                    all_questions.extend(valid)
+                    successful_calls += 1
+                    st.success(f"API Call {call_id}: Generated {len(valid)} valid questions")
+                else:
+                    st.warning(f"API Call {call_id}: No valid questions generated")
+                    failed_calls += 1
+                
+                # Store invalid questions for debugging
                 if "filtered_questions" not in st.session_state:
                     st.session_state.filtered_questions = []
                 st.session_state.filtered_questions.extend(invalid)
-            
-            if all_questions:
-                st.session_state.all_questions = all_questions
-                st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
-                st.session_state.quiz_state = {
-                    "current_difficulty": 4,
-                    "asked": set(),
-                    "answers": [],
-                    "quiz_end": False,
-                    "current_q_idx": None,
-                    "current_q": None,
-                    "show_explanation": False,
-                    "last_correct": None,
-                    "last_explanation": None,
-                }
-                st.success(f"✅ Questions generated! Starting the quiz with {len(all_questions)} questions...")
-                st.session_state.quiz_ready = True
-                st.rerun()
-            else:
-                st.error("No questions were generated. Please try again with a different PDF.")
+        
+        # Summary of API call results
+        st.info(f"Results: {successful_calls} successful calls, {failed_calls} failed calls")
+        
+        if all_questions:
+            st.session_state.all_questions = all_questions
+            st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
+            st.session_state.quiz_state = {
+                "current_difficulty": 4,
+                "asked": set(),
+                "answers": [],
+                "quiz_end": False,
+                "current_q_idx": None,
+                "current_q": None,
+                "show_explanation": False,
+                "last_correct": None,
+                "last_explanation": None,
+            }
+            st.success(f"✅ Questions generated! Starting the quiz with {len(all_questions)} questions from {successful_calls} API calls...")
+            st.session_state.quiz_ready = True
+            st.rerun()
+        else:
+            st.error("No valid questions were generated from any API call. Please try again with a different PDF.")
 
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
@@ -639,8 +702,3 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.csv",
                 mime="text/csv"
             )
-
-
-
-
-
