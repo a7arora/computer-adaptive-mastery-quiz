@@ -3,3 +3,5 @@ requests
 PyMuPDF
 pandas
 json5
+pytesseract
+Pillow
