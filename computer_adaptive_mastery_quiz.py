@@ -166,7 +166,7 @@ Return ONLY a valid JSON array. Each question object must have this EXACT struct
 
 **IMPORTANT JSON RULES:**
 - Use ARRAY format for options: ["option1", "option2", "option3", "option4"]
-- Do NOT use object format like {"A": "...", "B": "..."}
+- Do NOT use object format like {{"A": "...", "B": "..."}}
 - Do NOT include A), B), C), D) labels in the option text - just the content
 - Ensure all JSON is properly escaped (quotes, backslashes, etc.)
 - Return ONLY the JSON array, no additional text or markdown formatting
@@ -644,3 +644,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.csv",
                 mime="text/csv"
             )
+
