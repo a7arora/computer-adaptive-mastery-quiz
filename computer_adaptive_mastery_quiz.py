@@ -396,10 +396,6 @@ def compute_mastery_score(answers):
     return int(round(max(band_scores)))
 
 # App frontend
-st.title("AscendQuiz")
-score = compute_mastery_score(st.session_state.get("quiz_state", {}).get("answers", []))
-render_mastery_bar(score)  # Remove the duplicate calls later in the code
-
 def render_mastery_bar(score):
     if score < 30:
         color = "red"
@@ -452,9 +448,11 @@ def render_mastery_bar(score):
     </div>
     <div class="spacer"></div>
     """, unsafe_allow_html=True)
-
+ 
+st.title("AscendQuiz")
 score = compute_mastery_score(st.session_state.get("quiz_state", {}).get("answers", []))
-render_mastery_bar(score)
+render_mastery_bar(score)  # Remove the duplicate calls later in the code
+
 
 if "all_questions" not in st.session_state:
     st.markdown("""
@@ -642,4 +640,5 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.csv",
                 mime="text/csv"
             )
+
 
