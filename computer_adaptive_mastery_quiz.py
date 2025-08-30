@@ -135,15 +135,15 @@ def call_claude_api(prompt, api_key, call_id):
         return None, f"API call {call_id} exception: {str(e)}", call_id
 
 def make_parallel_api_calls(text_chunk, api_keys):
-    """Make 3 parallel API calls using different API keys"""
+    """Make 2 parallel API calls using different API keys to generate 24 questions (12 per call)"""
     prompt = generate_prompt(text_chunk)
     
     # Use ThreadPoolExecutor for parallel API calls
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        # Submit all API calls
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        # Submit two API calls
         future_to_call_id = {
             executor.submit(call_claude_api, prompt, api_key, i+1): i+1 
-            for i, api_key in enumerate(api_keys)
+            for i, api_key in enumerate(api_keys[:2])  # Use only the first two API keys
         }
         
         results = {}
@@ -156,6 +156,7 @@ def make_parallel_api_calls(text_chunk, api_keys):
                 results[call_id] = (None, f'Call {call_id} generated an exception: {exc}')
     
     return results
+
 
 def clean_response_text(text: str) -> str:
     """
@@ -702,4 +703,5 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.csv",
                 mime="text/csv"
             )
+
 
