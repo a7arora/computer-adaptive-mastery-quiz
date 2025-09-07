@@ -70,16 +70,52 @@ def call_deepseek_api(prompt):
         return None, response.text
     return response.json()["choices"][0]["message"]["content"], None
 
-
-def clean_response_text(text):
-    match = re.search(r"```(?:json)?\s*(.*?)```", text.strip(), re.DOTALL)
-    return match.group(1).strip() if match else text.strip()
-
 def parse_question_json(text):
+    """
+    Robustly parse DeepSeek output into a JSON list of questions.
+    This function will always return a list, even if the model output is messy.
+    """
+
+    def clean_response_text(raw):
+        # Strip markdown fences if present
+        match = re.search(r"```(?:json)?\s*(.*?)```", raw.strip(), re.DOTALL)
+        return match.group(1).strip() if match else raw.strip()
+
+    cleaned = clean_response_text(text)
+
+    # Try direct load first
     try:
-        return json.loads(clean_response_text(text))
+        obj = json.loads(cleaned)
+        if isinstance(obj, dict):
+            return [obj]  # wrap single object
+        if isinstance(obj, list):
+            return obj
     except Exception:
-        return []
+        pass
+
+    # If it's truncated (missing closing ]), try to fix
+    if cleaned.startswith("[") and not cleaned.endswith("]"):
+        try:
+            fixed = cleaned + "]"
+            return json.loads(fixed)
+        except Exception:
+            pass
+
+    # Extract all top-level {...} objects and parse them individually
+    objects = re.findall(r"\{.*?\}", cleaned, re.DOTALL)
+    parsed_objects = []
+    for obj_text in objects:
+        try:
+            parsed_objects.append(json.loads(obj_text))
+        except Exception:
+            continue
+
+    if parsed_objects:
+        return parsed_objects
+
+    # Absolute fallback
+    return []
+
 
 def filter_invalid_difficulty_alignment(questions):
     bloom_difficulty_ranges = {
@@ -445,5 +481,6 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
