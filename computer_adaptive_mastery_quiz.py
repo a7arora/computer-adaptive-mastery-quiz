@@ -22,6 +22,7 @@ def extract_text_from_pdf(pdf_file):
 
 def generate_prompt(text_chunk):
     return f"""
+IMPORTANT: Return exactly one JSON array and nothing else. The JSON must be valid (no markdown, no commentary, no backticks). Example: [ { "question": "...", "options": ["A...","B...","C...","D..."], ... }, ... ]
 You are a teacher who is designing a test with multiple choiced questions(each with 4 answer choices) to test content from a passage.
 
 Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. You can repeat the same questions if there is very little content, even though this is not preferred, so that there are 20 total questions. Please make sure that the question is something that relates to the material in the passage or an application/extension of it. Please do not use specialized vocabulary that is not explicitly stated in the passage without definition.(such as mentioning photosynthesis when a passage only talks about flowers- in that case please define pollination before asking a question about pollination)
@@ -445,3 +446,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
