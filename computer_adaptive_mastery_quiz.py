@@ -70,10 +70,13 @@ def call_deepseek_api(prompt):
         return None, response.text
     return response.json()["choices"][0]["message"]["content"], None
 
+import json
+import re
+
 def parse_question_json(text):
     """
     Robustly parse DeepSeek output into a JSON list of questions.
-    This function will always return a list, even if the model output is messy.
+    Always returns a list — attempts repair if needed.
     """
 
     def clean_response_text(raw):
@@ -87,7 +90,7 @@ def parse_question_json(text):
     try:
         obj = json.loads(cleaned)
         if isinstance(obj, dict):
-            return [obj]  # wrap single object
+            return [obj]
         if isinstance(obj, list):
             return obj
     except Exception:
@@ -101,7 +104,7 @@ def parse_question_json(text):
         except Exception:
             pass
 
-    # Extract all top-level {...} objects and parse them individually
+    # Extract all {...} objects and try to parse
     objects = re.findall(r"\{.*?\}", cleaned, re.DOTALL)
     parsed_objects = []
     for obj_text in objects:
@@ -109,12 +112,23 @@ def parse_question_json(text):
             parsed_objects.append(json.loads(obj_text))
         except Exception:
             continue
-
     if parsed_objects:
         return parsed_objects
 
+    # 🔥 Final repair: try json_repair (keeps structure even if broken)
+    try:
+        import json_repair
+        repaired = json_repair.loads(cleaned)
+        if isinstance(repaired, dict):
+            return [repaired]
+        if isinstance(repaired, list):
+            return repaired
+    except Exception:
+        pass
+
     # Absolute fallback
     return []
+
 
 
 def filter_invalid_difficulty_alignment(questions):
@@ -481,6 +495,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
