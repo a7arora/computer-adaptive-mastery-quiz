@@ -401,8 +401,7 @@ def render_mastery_bar(score):
     </div>
     <div class="spacer"></div>
     """, unsafe_allow_html=True)
-score = compute_mastery_score(st.session_state.get("quiz_state", {}).get("answers", []))
-render_mastery_bar(score)
+
 
 if "all_questions" not in st.session_state:
     st.markdown("""
@@ -517,32 +516,33 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         selected = st.radio("Select your answer:", options=rendered_options, key=f"radio_{idx}", index=None)
 
-
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
-            selected_letter = selected.split(".")[0].strip().upper()
-            letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
-            correct_letter = q["correct_answer"].strip().upper()
-            correct_index = letter_to_index.get(correct_letter, None)
+            if selected is None:
+                st.warning("Please select an answer before submitting.")
+            else:
+                selected_letter = selected.split(".")[0].strip().upper()
+                letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
+                correct_letter = q["correct_answer"].strip().upper()
+                correct_index = letter_to_index.get(correct_letter, None)
+                if correct_index is None:
+                    st.error("⚠️ Question error: Correct answer letter invalid.")
+                    state["quiz_end"] = True
+                    st.stop()
 
-            if correct_index is None:
-                st.error("⚠️ Question error: Correct answer letter invalid.")
-                state["quiz_end"] = True
-                st.stop()
+                correct = (selected_letter == correct_letter)
 
-            correct = (selected_letter == correct_letter)
+                # Record answer
+                state["asked"].add((state["current_difficulty"], idx))
+                state["answers"].append((state["current_difficulty"], correct))
+                state["last_correct"] = correct
+                state["last_explanation"] = q["explanation"]
+                state["show_explanation"] = True
 
-            # Record answer
-            state["asked"].add((state["current_difficulty"], idx))
-            state["answers"].append((state["current_difficulty"], correct))
-            state["last_correct"] = correct
-            state["last_explanation"] = q["explanation"]
-            state["show_explanation"] = True
-
-            # Update mastery score according to quiz question
-            score = compute_mastery_score(state["answers"])
-            #end when students reach mastery at 70/100
-            if score >= 70:
-                state["quiz_end"] = True
+                # Update mastery score according to quiz question
+                score = compute_mastery_score(state["answers"])
+                #end when students reach mastery at 70/100
+                if score >= 70:
+                    state["quiz_end"] = True
 
         if state.get("show_explanation", False):
             if state["last_correct"]:
@@ -594,6 +594,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
