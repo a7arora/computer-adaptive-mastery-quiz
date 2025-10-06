@@ -1,3 +1,4 @@
+
 import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
@@ -22,34 +23,56 @@ def extract_text_from_pdf(pdf_file):
 
 def generate_prompt(text_chunk):
     return f"""
-You are a teacher who is designing a test with multiple choiced questions(each with 4 answer choices) to test content from a passage.
+You are a teacher who is designing a test with multiple choice questions (each with 4 answer choices) to test content from a passage.
 
-Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage. You can repeat the same questions if there is very little content, even though this is not preferred, so that there are 20 total questions. Please make sure that the question is something that relates to the material in the passage or an application/extension of it. Please do not use specialized vocabulary that is not explicitly stated in the passage without definition.(such as mentioning photosynthesis when a passage only talks about flowers- in that case please define pollination before asking a question about pollination)
+Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
 
+**CRITICAL REQUIREMENT - NO TEXT REFERENCES:**
+- Questions must be COMPLETELY SELF-CONTAINED and not reference the original text
+- DO NOT use phrases like "according to the passage," "the text states," "the first example," "as mentioned," "the author discusses," etc.
+- DO NOT reference specific figures, tables, pages, or sections from the passage
+- Present all necessary context within the question itself
+- Students should be able to answer based on their understanding of the concepts, not memory of where things appeared in the text
+- Frame questions as direct concept tests, not reading comprehension
+- If there is information about ISBN or ebook distribution consequences or copyrights, do not ask questions about these things. Only ask questions about academic content
+
+**Example of what NOT to do:**
+❌ "According to the passage, what does the first example demonstrate?"
+❌ "The text mentions three types of X. Which one is described as Y?"
+
+**Example of what TO do:**
+✅ "In SAS programming, dates are stored as the number of days from which reference point?"
+✅ "What happens when you use correlated features in a Random Forest model?"
 
 **Requirements**:
 - 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard(<40%)
 
 **Each question must include the following fields:**
 
-- "question": A clear, concise, and unambiguous question directly related or an application of content from the passage that aligns with key learning objectives. The question should be designed to test understanding of material covered in the passage and should be made so it could show up on an educational assessment testing material from this passage. The question should be cognitively appropriate for the specified difficulty level, encouraging critical thinking, application, analysis, or synthesis rather than rote recall if not at the easiest difficulty level. Please make the question at a slightly higher difficulty than you would expect a question of this difficulty to be at(i.e. creating a medium hard question when a medium question is requested). Avoid overly complex wording or ambiguity to ensure students understand exactly what is being asked. Furthermore, make sure that the question has all the context in itself and does not reference specific figures or pages in the passage, as the question is designed for the user to do independently without the passage, even though it test knowledge of content fron the passage. You tend to make questions at an easier difficulty than requested, so make it slightly more difficult than you would expect from the given difficulty level. 
-- "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D"(with one of them being the correct answer). If the question is of medium or hard difficulty, please come up with wrong answers that are ones that a user who does not know the concept well or makes an error would select. Please make sure that only one answer choice is correct by solving the problem and checking all of the answer choices carefully and thoroughly. It should not be ambigiuous which as to whether an answer choice is correct or not.
-- "correct_answer": The letter ("A", "B", "C", or "D") corresponding to the correct option. Please make sure that this answer is correct and is clearly the only correct answer.
-- "explanation": A deep, pedagogically useful explanation that **teaches the concept** behind the correct answer and analyzes the flaws in the others. The explanation must:
-    1. Start by stating the correct letter and full answer.
-    2. Teach **why** that answer is correct using **conceptual reasoning** — including how the mechanism works, or why the property matters — not just restating facts.
-       - For example, if the correct answer is "correlation between features degrades performance," then explain **why correlated features reduce tree diversity in Random Forests**, which is the core reason performance drops.
-       - Use step-by-step reasoning, examples, or analogies when helpful.
-    3. For each incorrect answer, state its letter and text, and **explain why it's wrong**, including what misconception a student might have that could lead them to choose it.
-    4. The tone should be that of a **tutor or explainer**, helping a confused student understand both the correct idea and the traps in the wrong ones.
-- "cognitive_level": The Bloom's Taxonomy level required to answer the question correctly. Choose from: "Remember", "Understand", "Apply", "Analyze", "Evaluate", or "Create". Think deeply about which cognitive skill is actually tested.
+- "question": A clear, concise, and unambiguous question that tests understanding of concepts from the passage. The question should be COMPLETELY SELF-CONTAINED with all necessary context included. Never reference "the passage," "the text," specific examples by position (first, second, etc.), or figures/tables. Ask about the concept directly. Make the question slightly more difficult than typical for the specified difficulty level. Ensure it tests conceptual understanding that would be valuable for learning, not memorization of text structure.
 
-Avoid vague phrases like “According to the passage.” Don’t just repeat the answer. Your goal is to help the student learn the concept by explaining it clearly and thoroughly.
-- "estimated_correct_pct": A numeric estimate of the percentage of students expected to answer correctly (consistent with the difficulty category). Make it based on factors such as complexity, question context, inference required, distractors, and detail recall. Put yourself in the shoes of a student who is taking a quiz or test based on this unit, and consider how likely a student is to pick both the correct and incorrect answer, simulating the students thinking process. You tend to think a question is harder than expected(putting into a lower percentage correct category), so please evaluate the question thoroughly and based on real evidence from student abilities on similar topics/questions if possible.
-- "reasoning": A brief rationale explaining why the question fits its percentage correct assignment, considering factors such as complexity, inference required, answer  or detail recall.
+- "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D" (with one being correct). For medium/hard questions, create wrong answers that reflect common misconceptions. Ensure only one answer is clearly correct.
 
-All math expressions, formulas, variables, and symbols in the questions, answer choices, and explanations must be written in valid LaTeX format using $...$ for inline math and $$...$$ for display math when appropriate. This ensures proper rendering in LaTeX-supported environments.
-Return a valid JSON list of 20 questions. If there is insufficient content, as previously stated, duplicate existing questions to create a total of 20 questions at the appropriate difficulty levels 
+- "correct_answer": The letter ("A", "B", "C", or "D") corresponding to the correct option.
+
+- "explanation": A deep, pedagogically useful explanation that teaches the concept behind the correct answer. The explanation must:
+    1. Start by stating the correct letter and full answer
+    2. Explain WHY that answer is correct using conceptual reasoning - explain mechanisms, properties, or principles
+    3. For each incorrect answer, explain why it's wrong and what misconception might lead to choosing it
+    4. Focus on teaching the underlying concept, not referencing where information appeared in the text
+    5. Use the tone of a tutor helping a student understand the concept
+
+- "cognitive_level": Choose from "Remember", "Understand", "Apply", "Analyze", "Evaluate", or "Create" based on the cognitive skill actually tested.
+
+- "estimated_correct_pct": Numeric estimate of percentage of students expected to answer correctly. Consider complexity, inference required, and common misconceptions. You tend to underestimate difficulty, so evaluate thoroughly.
+
+- "reasoning": Brief rationale for the percentage assignment considering complexity, inference required, and detail recall.
+
+All math expressions must use valid LaTeX format with $...$ for inline math and $$...$$ for display math.
+
+Return a valid JSON list of 20 questions. Focus on testing conceptual understanding rather than text memorization.
+
+If the passage contains code or table output, generate questions about how the code works and what outputs mean - but present these as general programming/analysis questions, not as references to "the code shown" or "the table above."
 
 Passage:
 {text_chunk}
@@ -71,16 +94,139 @@ def call_deepseek_api(prompt):
     return response.json()["choices"][0]["message"]["content"], None
 
 
-def clean_response_text(text):
-    match = re.search(r"```(?:json)?\s*(.*?)```", text.strip(), re.DOTALL)
-    return match.group(1).strip() if match else text.strip()
+def clean_response_text(text: str) -> str:
+    """
+    Extracts the JSON part from a model response.
+    Strips ```json fences, trailing commentary, and truncates at the last bracket.
+    """
+    text = text.strip()
 
-def parse_question_json(text):
+    # Remove ```json ... ``` fences (more flexible pattern)
+    fence_patterns = [
+        r"```json\s*(.*?)```",  # ```json content ```
+        r"```\s*(.*?)```",      # ``` content ```
+        r"`{3,}\s*json\s*(.*?)`{3,}",  # Multiple backticks with json
+        r"`{3,}\s*(.*?)`{3,}"   # Multiple backticks without json
+    ]
+    
+    for pattern in fence_patterns:
+        fence_match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+        if fence_match:
+            text = fence_match.group(1).strip()
+            break
+
+    # Find the JSON array boundaries
+    # Look for the first '[' and last ']'
+    start_idx = text.find('[')
+    end_idx = text.rfind(']')
+    
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        text = text[start_idx:end_idx + 1]
+        return text.strip()
+
+    # Fallback: look for object boundaries
+    start_idx = text.find('{')
+    end_idx = text.rfind('}')
+    
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        text = text[start_idx:end_idx + 1]
+        return text.strip()
+
+    return text
+
+
+def repair_json(text: str) -> str:
+    """
+    Repairs common JSON formatting issues
+    """
+    # Remove trailing commas before ] or }
+    text = re.sub(r',\s*([\]}])', r'\1', text)
+
+    # Fix }{ into }, {
+    text = re.sub(r'}\s*{', r'}, {', text)
+
+    # Fix ] [ into ], [
+    text = re.sub(r']\s*\[', r'], [', text)
+
+    # Replace percent signs in numbers (e.g. 92% -> 92)
+    text = re.sub(r'(\d+)\s*%', r'\1', text)
+
+    # Fix unescaped quotes in strings (more conservative approach)
+    # This is a simplified fix - for more complex cases, you might need a proper JSON parser
+    text = re.sub(r'(?<!\\)"([^"]*?)(?<!\\)"(?=\s*[,\]}])', lambda m: '"' + m.group(1).replace('"', '\\"') + '"', text)
+    
+    # Ensure the text starts with [ if it looks like an array
+    text = text.strip()
+    if not text.startswith('[') and not text.startswith('{'):
+        # Try to find the start of JSON
+        json_start = re.search(r'[\[{]', text)
+        if json_start:
+            text = text[json_start.start():]
+    
+    return text
+
+
+def parse_question_json(text: str):
+    """
+    Parse JSON with better error handling and debugging
+    """
+    # Print raw text for debugging
+    print(f"Raw API response length: {len(text)}")
+    print(f"Raw API response (first 200 chars): {text[:200]}")
+    
+    cleaned = clean_response_text(text)
+    print(f"Cleaned text length: {len(cleaned)}")
+    print(f"Cleaned text (first 200 chars): {cleaned[:200]}")
+    
+    cleaned = repair_json(cleaned)
+    print(f"Repaired text (first 200 chars): {cleaned[:200]}")
+
+    # Try standard JSON parsing first
     try:
-        return json.loads(clean_response_text(text))
-    except Exception:
-        return []
-
+        result = json.loads(cleaned)
+        print(f"Successfully parsed {len(result) if isinstance(result, list) else 1} questions")
+        return result
+    except json.JSONDecodeError as e:
+        print(f"Standard JSON parsing failed: {e}")
+        
+        # Try json5 as fallback (more lenient parsing)
+        try:
+            import json5
+            result = json5.loads(cleaned)
+            print(f"JSON5 parsing successful: {len(result) if isinstance(result, list) else 1} questions")
+            return result
+        except Exception as e2:
+            print(f"JSON5 parsing also failed: {e2}")
+            
+            # Final fallback: try to extract individual questions manually
+            try:
+                # Look for question objects and try to parse them individually
+                questions = []
+                # Split by question boundaries and try to parse each
+                question_pattern = r'\{\s*"question":[^}]*?"reasoning":[^}]*?\}'
+                potential_questions = re.findall(question_pattern, cleaned, re.DOTALL)
+                
+                for q_text in potential_questions:
+                    try:
+                        q_obj = json.loads(q_text)
+                        questions.append(q_obj)
+                    except:
+                        continue
+                
+                if questions:
+                    print(f"Manual extraction successful: {len(questions)} questions")
+                    return questions
+            except:
+                pass
+            
+            # Log the error with more context
+            st.error("⚠️ JSON parse failed:")
+            st.error(f"Standard JSON error: {e}")
+            st.error(f"JSON5 error: {e2}")
+            st.text("Raw cleaned text (first 1000 chars):")
+            st.text(cleaned[:1000])
+            
+            return []
 def filter_invalid_difficulty_alignment(questions):
     bloom_difficulty_ranges = {
         "Remember": (70, 100),
@@ -95,10 +241,14 @@ def filter_invalid_difficulty_alignment(questions):
     invalid = []
 
     for q in questions:
-        cog = q.get("cognitive_level", "").strip().capitalize()
+        if not isinstance(q, dict):  # skip anything not a dict
+            invalid.append(q)
+            continue
+
+        cog = str(q.get("cognitive_level", "")).strip().capitalize()
         try:
             pct = int(q.get("estimated_correct_pct", -1))
-        except:
+        except Exception:
             pct = -1
 
         if cog in bloom_difficulty_ranges and 0 <= pct <= 100:
@@ -111,7 +261,6 @@ def filter_invalid_difficulty_alignment(questions):
             invalid.append(q)
 
     return valid, invalid
-
 
 def assign_difficulty_label(estimated_pct):
     try:
@@ -445,3 +594,15 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
+
+
+
+
+
+
+
+
+
+
+
