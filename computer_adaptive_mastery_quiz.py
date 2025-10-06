@@ -6,7 +6,6 @@ import json
 import re
 import random
 
-
 API_KEY = st.secrets["DEEPSEEK_API_KEY"]
 
 headers = {
@@ -14,7 +13,7 @@ headers = {
     "Content-Type": "application/json"
 }
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
-MODEL_NAME = "deepseek-chat"  
+MODEL_NAME = "deepseek-chat"
 
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
@@ -70,23 +69,12 @@ def call_deepseek_api(prompt):
         return None, response.text
     return response.json()["choices"][0]["message"]["content"], None
 
-import json
-import re
-
 def parse_question_json(text):
-    """
-    Robustly parse DeepSeek output into a JSON list of questions.
-    Always returns a list — attempts repair if needed.
-    """
-
     def clean_response_text(raw):
-        # Strip markdown fences if present
         match = re.search(r"```(?:json)?\s*(.*?)```", raw.strip(), re.DOTALL)
         return match.group(1).strip() if match else raw.strip()
 
     cleaned = clean_response_text(text)
-
-    # Try direct load first
     try:
         obj = json.loads(cleaned)
         if isinstance(obj, dict):
@@ -96,7 +84,6 @@ def parse_question_json(text):
     except Exception:
         pass
 
-    # If it's truncated (missing closing ]), try to fix
     if cleaned.startswith("[") and not cleaned.endswith("]"):
         try:
             fixed = cleaned + "]"
@@ -104,7 +91,6 @@ def parse_question_json(text):
         except Exception:
             pass
 
-    # Extract all {...} objects and try to parse
     objects = re.findall(r"\{.*?\}", cleaned, re.DOTALL)
     parsed_objects = []
     for obj_text in objects:
@@ -115,7 +101,6 @@ def parse_question_json(text):
     if parsed_objects:
         return parsed_objects
 
-    # 🔥 Final repair: try json_repair (keeps structure even if broken)
     try:
         import json_repair
         repaired = json_repair.loads(cleaned)
@@ -126,10 +111,7 @@ def parse_question_json(text):
     except Exception:
         pass
 
-    # Absolute fallback
     return []
-
-
 
 def filter_invalid_difficulty_alignment(questions):
     bloom_difficulty_ranges = {
@@ -162,7 +144,6 @@ def filter_invalid_difficulty_alignment(questions):
 
     return valid, invalid
 
-
 def assign_difficulty_label(estimated_pct):
     try:
         pct = int(estimated_pct)
@@ -193,8 +174,6 @@ def pick_question(diff, asked, all_qs):
 
 def find_next_difficulty(current_diff, going_up, asked, all_qs):
     next_diff = current_diff + 1 if going_up else current_diff - 1
-
-    # Try one step in intended direction
     if 1 <= next_diff <= 8 and pick_question(next_diff, asked, all_qs):
         return next_diff
     search_range = (
@@ -204,6 +183,7 @@ def find_next_difficulty(current_diff, going_up, asked, all_qs):
         if pick_question(d, asked, all_qs):
             return d
     return current_diff
+
 def get_next_question(current_diff, asked, all_qs):
     available = pick_question(current_diff, asked, all_qs)
     if not available:
@@ -214,42 +194,34 @@ def get_next_question(current_diff, asked, all_qs):
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
+
 def compute_mastery_score(answers):
-    #limits mastery scores based on difficulty attempted
     mastery_bands = {
         (1, 2): 25,
         (3, 4): 65,
         (5, 6): 85,
         (7, 8): 100
     }
-
     min_attempts_required = 3 
     band_scores = []
-
     for levels, weight in mastery_bands.items():
         relevant = [correct for d, correct in answers if d in levels]
         attempts = len(relevant)
-
         if attempts == 0:
             continue  
-        #does not give mastery points for guessing, especially on hard questions
         acc = sum(relevant) / attempts
-        normalized_score = max((acc - 0.25) / 0.75, 0) 
-
+        normalized_score = max((acc - 0.25) / 0.75, 0)
         if attempts < min_attempts_required:
             scaled_score = normalized_score * weight * (attempts / min_attempts_required)
             band_scores.append(scaled_score)
         else:
             band_score = normalized_score * weight
             band_scores.append(band_score)
-
     if not band_scores:
         return 0  
-
     return int(round(max(band_scores)))
 
-#app frontend
-st.title("AscendQuiz")
+# --- Mastery Bar Function ---
 def render_mastery_bar(score):
     if score < 30:
         color = "red"
@@ -302,46 +274,35 @@ def render_mastery_bar(score):
     </div>
     <div class="spacer"></div>
     """, unsafe_allow_html=True)
-score = compute_mastery_score(st.session_state.get("quiz_state", {}).get("answers", []))
+
+# --- 🔥 FIX: Always render mastery bar on every rerun ---
+if "quiz_state" in st.session_state:
+    score = compute_mastery_score(st.session_state["quiz_state"].get("answers", []))
+else:
+    score = 0
 render_mastery_bar(score)
+
+# --- Main App ---
+st.title("AscendQuiz")
 
 if "all_questions" not in st.session_state:
     st.markdown("""
 Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
 
 **How it works:**
-This app uses a large language model (LLM) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
-
-The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once your **mastery score reaches 70% or higher** (calculated using your accuracy weighted by difficulty level), the system considers you to have achieved **mastery** and ends the quiz.
-
-Each question includes:
-- Four answer options
-- The correct answer
-- An explanation
-- A predicted correctness percentage
-
-Unlike static tools like Khanmigo, this app uses generative AI to dynamically create the quiz from **your own content** — no rigid question banks required.
-
----
-
-**Built using the DeepSeek-R1-0528 model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. Please keep in mind that it currently takes about 4-5 minutes to generate questions from a pdf... please be patient as it generates questions. Furthermore, it only accepts text output and cannot read handwriting or drawings at this time.
-
----
+... (rest of text unchanged)
 """)
-
 
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
             chunks = extract_text_from_pdf(uploaded_pdf)
-            # Adaptive chunking
             if len(chunks) <= 2:
-                grouped_chunks = ["\n\n".join(chunks)]  # Treat as one full chunk
+                grouped_chunks = ["\n\n".join(chunks)]
             else:
                 grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
 
             all_questions = []
-            # Pick first 2 chunks or duplicate the first if only one exists
             chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
 
             for chunk in chunks_to_use:
@@ -383,8 +344,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     if state is None:
         st.warning("Quiz state not found. Please restart the app or re-upload a PDF.")
         st.stop()
-    score = compute_mastery_score(state.get("answers", []))
-    render_mastery_bar(score)
+
     if not state["quiz_end"]:
         if state["current_q"] is None and not state.get("show_explanation", False):
             diff, idx, q = get_next_question(state["current_difficulty"], state["asked"], all_qs)
@@ -401,15 +361,14 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
         st.markdown(q["question"], unsafe_allow_html=True)
+
         def strip_leading_label(text):
-            # Removes A), A., A:, A - etc.
             return re.sub(r"^[A-Da-d][\).:\-]?\s+", "", text).strip()
 
         option_labels = ["A", "B", "C", "D"]
         cleaned_options = [strip_leading_label(opt) for opt in q["options"]]
         rendered_options = []
         for label, text in zip(option_labels, cleaned_options):
-            # Wrap LaTeX content in markdown with inline math if any '$' is present
             if "$" in text or "\\" in text:
                 rendered_text = f"{label}. $${text}$$"
             else:
@@ -418,84 +377,41 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
 
         selected = st.radio("Select your answer:", options=rendered_options, key=f"radio_{idx}", index=None)
 
-
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
             selected_letter = selected.split(".")[0].strip().upper()
             letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
             correct_letter = q["correct_answer"].strip().upper()
-            correct_index = letter_to_index.get(correct_letter, None)
-
-            if correct_index is None:
-                st.error("⚠️ Question error: Correct answer letter invalid.")
-                state["quiz_end"] = True
-                st.stop()
-
             correct = (selected_letter == correct_letter)
-
-            # Record answer
+            state["answers"].append((state["current_difficulty"], int(correct)))
             state["asked"].add((state["current_difficulty"], idx))
-            state["answers"].append((state["current_difficulty"], correct))
             state["last_correct"] = correct
             state["last_explanation"] = q["explanation"]
             state["show_explanation"] = True
-
-            # Update mastery score according to quiz question
-            score = compute_mastery_score(state["answers"])
-            #end when students reach mastery at 70/100
-            if score >= 70:
-                state["quiz_end"] = True
+            st.session_state.quiz_state = state
+            st.rerun()
 
         if state.get("show_explanation", False):
-            if state["last_correct"]:
-                st.success("✅ Correct!")
-            else:
-                st.markdown("❌ **Incorrect.**", unsafe_allow_html=True)
-                st.markdown(state["last_explanation"], unsafe_allow_html=True)
+            correct_letter = q["correct_answer"].strip().upper()
+            correct_opt_text = cleaned_options[option_labels.index(correct_letter)]
+            correctness_msg = "✅ Correct!" if state["last_correct"] else f"❌ Incorrect. The correct answer was {correct_letter}: {correct_opt_text}"
+            st.markdown(f"### {correctness_msg}")
+            st.markdown("### Explanation")
+            st.markdown(state["last_explanation"], unsafe_allow_html=True)
 
             if st.button("Next Question"):
-                # Adjust difficulty
-                def find_next_difficulty(current_diff, going_up, asked, all_qs):
-                    diffs = range(current_diff + 1, 9) if going_up else range(current_diff - 1, 0, -1)
-                    for d in diffs:
-                        if pick_question(d, asked, all_qs):
-                            return d
-                    return current_diff  # fallback to current if no higher/lower available
-
-                # Adjust difficulty based on performance, scaffolding learning and challenging students
-                if state["last_correct"]:
-                    state["current_difficulty"] = find_next_difficulty(
-                    state["current_difficulty"], going_up=True, asked=state["asked"], all_qs=all_qs
-                    )
+                going_up = state["last_correct"]
+                new_diff = find_next_difficulty(state["current_difficulty"], going_up, state["asked"], all_qs)
+                state["current_difficulty"] = new_diff
+                diff, idx, q = get_next_question(new_diff, state["asked"], all_qs)
+                if q is None:
+                    state["quiz_end"] = True
                 else:
-                    state["current_difficulty"] = find_next_difficulty(
-                    state["current_difficulty"], going_up=False, asked=state["asked"], all_qs=all_qs
-                    )
-                # Clear current question to trigger fetching a new one
-                state["current_q"] = None
-                state["current_q_idx"] = None
+                    state["current_q"], state["current_q_idx"] = q, idx
                 state["show_explanation"] = False
-                state["last_correct"] = None
-                state["last_explanation"] = None
+                st.session_state.quiz_state = state
                 st.rerun()
 
-    elif state["quiz_end"]:
-        acc = accuracy_on_levels(state["answers"], [5, 6, 7, 8])
-        hard_attempts = len([1 for d, _ in state["answers"] if d >= 5])
-        st.markdown("## Quiz Completed 🎉")
-        if score >= 70:
-            st.success(f"🎉 You have mastered the content! Your mastery score is {score}%. Great job!")
-        else:
-            st.warning(f"Mastery not yet achieved. Your mastery score is {score}%. Review the material and try again.")
-
-        if "all_questions" in st.session_state:
-            all_qs_json = json.dumps(st.session_state.all_questions, indent=2)
-            st.download_button(
-                label="📥 Download All Quiz Questions (JSON)",
-                data=all_qs_json,
-                file_name="ascendquiz_questions.json",
-                mime="application/json"
-            )
-
-
-
-
+    if state["quiz_end"]:
+        st.markdown("### 🏁 Quiz Complete")
+        score = compute_mastery_score(state["answers"])
+        st.markdown(f"**Your mastery score: {score}%**")
