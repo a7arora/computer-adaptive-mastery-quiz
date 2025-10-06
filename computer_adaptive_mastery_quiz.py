@@ -351,55 +351,81 @@ def compute_mastery_score(answers):
 st.title("AscendQuiz")
 def render_mastery_bar(score):
     if score < 30:
-        color = "red"
+        color = "#dc3545"  # red
         text_color = "white"
     elif score < 70:
-        color = "yellow"
+        color = "#ffc107"  # yellow
         text_color = "black"
     else:
-        color = "green"
+        color = "#28a745"  # green
         text_color = "white"
 
     st.markdown(f"""
     <style>
+        /* Hide Streamlit's default header padding */
+        .stApp {{
+            padding-top: 70px;
+        }}
+        
         .mastery-bar-wrapper {{
             position: fixed;
             top: 0;
             left: 0;
+            right: 0;
             width: 100%;
-            z-index: 9999;
+            z-index: 999999;
             background-color: white;
-            padding: 8px 16px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            padding: 12px 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            border-bottom: 1px solid #ddd;
         }}
+        
         .mastery-bar {{
-            border: 1px solid #ccc;
+            border: 2px solid #ccc;
             border-radius: 8px;
             overflow: hidden;
-            height: 24px;
+            height: 28px;
             width: 100%;
-            background-color: #eee;
+            background-color: #f0f0f0;
+            position: relative;
         }}
+        
         .mastery-bar-fill {{
             height: 100%;
             width: {score}%;
             background-color: {color};
-            text-align: center;
-            color: {text_color};
-            font-weight: bold;
-            line-height: 24px;
+            transition: width 0.3s ease;
+            position: absolute;
+            top: 0;
+            left: 0;
         }}
-        .spacer {{
-            height: 60px;
+        
+        .mastery-bar-text {{
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: {text_color if score > 10 else 'black'};
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 2;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }}
     </style>
 
     <div class="mastery-bar-wrapper">
+        <div style="font-size: 12px; margin-bottom: 4px; color: #666; font-weight: 500;">
+            Mastery Progress
+        </div>
         <div class="mastery-bar">
-            <div class="mastery-bar-fill">{score}%</div>
+            <div class="mastery-bar-fill"></div>
+            <div class="mastery-bar-text">{score}%</div>
         </div>
     </div>
-    <div class="spacer"></div>
     """, unsafe_allow_html=True)
 
 
@@ -594,6 +620,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
