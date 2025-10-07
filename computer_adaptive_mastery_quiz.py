@@ -36,43 +36,177 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
 - Frame questions as direct concept tests, not reading comprehension
 - If there is information about ISBN or ebook distribution consequences or copyrights, do not ask questions about these things. Only ask questions about academic content
 
-**Example of what NOT to do:**
-❌ "According to the passage, what does the first example demonstrate?"
-❌ "The text mentions three types of X. Which one is described as Y?"
+**CRITICAL: Design Questions That Test TRUE MASTERY, Not Test-Taking Skills**
 
-**Example of what TO do:**
-✅ "In SAS programming, dates are stored as the number of days from which reference point?"
-✅ "What happens when you use correlated features in a Random Forest model?"
+Your goal is to create questions where students CANNOT get the correct answer through:
+- Process of elimination with obviously implausible answers
+- Common sense reasoning without domain-specific knowledge
+- Guessing based on option patterns, lengths, or complexity differences
+- Recognizing what "sounds right" based on everyday language
+- Using the question wording itself as a hint to the answer
+
+**For EVERY question, ensure:**
+
+1. **All four options are plausible to someone WITHOUT domain expertise**
+   - Wrong answers should represent actual misconceptions or partial understanding
+   - Avoid absurd options that anyone could eliminate (e.g., if asking about a biological process, don't include "it turns purple" as an option)
+   - All options should be similar in length, specificity, and technical complexity
+   - Don't mix highly technical language in one option with casual language in others
+
+2. **The question cannot be answered through linguistic/semantic clues alone**
+   - Don't ask "What does [term] do?" when the term's name in everyday English reveals the answer
+   - Avoid questions where the correct answer repeats key words from the question
+   - Don't make the correct answer significantly more detailed/specific than wrong answers
+   - Ensure wrong answers use equally precise terminology
+
+3. **Wrong answers reflect genuine confusion, not nonsense**
+   - Each wrong answer should be what a student might choose if they:
+     * Confused two related concepts
+     * Applied a rule from a different context
+     * Made a common calculation error
+     * Remembered only part of the concept
+   - Never include options that are absurd or completely unrelated to the topic
+
+**Examples of BAD questions (too easy to guess without knowledge):**
+
+❌ **Math**: "What is the derivative of x²?"
+   - Options: A) 2x, B) Purple, C) √x, D) The number 7
+   - Problem: Option B and D are absurd; anyone can eliminate them
+
+❌ **Biology**: "What does the mitochondrion do?"
+   - Options: A) Produces energy, B) Makes the cell blue, C) Stores memories, D) Nothing
+   - Problem: "Mitochondrion" sounds like "might" + "power" in English; B/C/D are nonsense
+
+❌ **Physics**: "What happens when you compress a gas at constant temperature?"
+   - Options: A) Pressure increases, B) It becomes solid immediately, C) Gravity reverses, D) Mass decreases
+   - Problem: B/C/D violate basic logic; correct answer follows from common sense about squeezing things
+
+❌ **History**: "What was the primary cause of the Civil War?"
+   - Options: A) Slavery and states' rights (detailed), B) Economic factors, C) Politics, D) War
+   - Problem: Option A is much more specific; C and D are too vague/circular
+
+**Examples of GOOD questions (require actual domain knowledge):**
+
+✅ **Math**: "For the function f(x) = x² - 4x + 4, what is the nature of its roots?"
+   - A) Two distinct real roots
+   - B) One repeated real root
+   - C) Two complex conjugate roots  
+   - D) No roots exist
+   - Why good: Requires discriminant calculation; all options are mathematically meaningful
+
+✅ **Biology**: "During aerobic respiration, where does the electron transport chain occur?"
+   - A) Inner mitochondrial membrane
+   - B) Outer mitochondrial membrane
+   - C) Mitochondrial matrix
+   - D) Cristae folds exclusively
+   - Why good: All are parts of mitochondria; requires specific knowledge; A and D both seem correct without deep understanding
+
+✅ **Physics**: "A gas undergoes isothermal compression. Which statement is correct?"
+   - A) Internal energy remains constant; work is done on the system
+   - B) Internal energy decreases; work is done by the system  
+   - C) Internal energy increases; no heat is exchanged
+   - D) Internal energy remains constant; no work is exchanged
+   - Why good: All involve thermodynamic concepts; requires understanding isothermal process properties
+
+✅ **Chemistry**: "Which factor does NOT affect the rate of an enzyme-catalyzed reaction at optimal conditions?"
+   - A) Total amount of product already formed
+   - B) Substrate concentration
+   - C) Enzyme concentration
+   - D) Presence of competitive inhibitors
+   - Why good: Three factors DO affect rate (plausible); requires understanding enzyme kinetics, not guessing
+
+**Difficulty Calibration Guidelines:**
+
+When estimating "estimated_correct_pct", consider that students may have:
+- General intelligence and test-taking skills
+- Ability to eliminate absurd options
+- Common sense reasoning
+- Pattern recognition abilities
+
+**Your difficulty estimates should reflect:**
+
+- **85-100% correct**: Direct recall of explicitly stated, simple facts with no calculation or inference
+  - Even here, ensure all four options are factually plausible
+  - Example: "What is the SI unit of force?" (if passage defined it clearly)
+
+- **70-84% correct**: Understanding of straightforward concepts with ONE step of reasoning
+  - Wrong answers should represent adjacent/related concepts
+  - Example: Distinguishing between related but distinct terms covered in passage
+
+- **50-69% correct**: Application to new scenarios OR multi-step reasoning
+  - Wrong answers should reflect common errors in application
+  - Requires connecting multiple concepts
+  - Example: Using a formula in a context slightly different from passage examples
+
+- **30-49% correct**: Analysis requiring deep understanding OR synthesis of multiple concepts
+  - Wrong answers should seem correct if you only partially understand
+  - May involve subtle distinctions or counterintuitive results
+  - Example: Predicting outcomes when multiple factors interact
+
+- **Below 30%**: Evaluation/creation level tasks with genuine ambiguity
+  - Multiple answers may seem defensible
+  - Requires expert-level judgment or advanced problem-solving
+
+**IMPORTANT DIFFICULTY CHECK:**
+Before assigning estimated_correct_pct below 70%, ask yourself:
+1. Could a clever person with no domain knowledge eliminate 2+ options using logic alone?
+2. Does the question wording hint at the answer through word associations?
+3. Are any options absurd enough that anyone would eliminate them?
+4. Could someone pattern-match (longest/most specific option is often correct)?
+
+If you answered YES to any of these, the question is easier than you think. Increase the percentage OR redesign the options.
 
 **Requirements**:
-- 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard(<40%)
+- 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard (<40%)
 
 **Each question must include the following fields:**
 
-- "question": A clear, concise, and unambiguous question that tests understanding of concepts from the passage. The question should be COMPLETELY SELF-CONTAINED with all necessary context included. Never reference "the passage," "the text," specific examples by position (first, second, etc.), or figures/tables. Ask about the concept directly. Make the question slightly more difficult than typical for the specified difficulty level. Ensure it tests conceptual understanding that would be valuable for learning, not memorization of text structure.
+- "question": A clear, concise, and unambiguous question that tests understanding of concepts from the passage. The question should be COMPLETELY SELF-CONTAINED with all necessary context included. Never reference "the passage," "the text," specific examples by position (first, second, etc.), or figures/tables. Ask about the concept directly.
 
-- "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D" (with one being correct). For medium/hard questions, create wrong answers that reflect common misconceptions. Ensure only one answer is clearly correct.
+- "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D" (with one being correct). ALL four options must be similar in:
+    * Length (within 20% of each other)
+    * Specificity and detail level
+    * Technical complexity
+    * Grammatical structure
+  Wrong answers must represent genuine misconceptions from the domain, not random nonsense.
 
 - "correct_answer": The letter ("A", "B", "C", or "D") corresponding to the correct option.
 
 - "explanation": A deep, pedagogically useful explanation that teaches the concept behind the correct answer. The explanation must:
     1. Start by stating the correct letter and full answer
     2. Explain WHY that answer is correct using conceptual reasoning - explain mechanisms, properties, or principles
-    3. For each incorrect answer, explain why it's wrong and what misconception might lead to choosing it
+    3. For each incorrect answer, explain:
+       - Why it's wrong
+       - What specific misconception or error would lead someone to choose it
+       - What partial understanding might make it seem correct
     4. Focus on teaching the underlying concept, not referencing where information appeared in the text
     5. Use the tone of a tutor helping a student understand the concept
 
 - "cognitive_level": Choose from "Remember", "Understand", "Apply", "Analyze", "Evaluate", or "Create" based on the cognitive skill actually tested.
 
-- "estimated_correct_pct": Numeric estimate of percentage of students expected to answer correctly. Consider complexity, inference required, and common misconceptions. You tend to underestimate difficulty, so evaluate thoroughly.
+- "estimated_correct_pct": Numeric estimate of percentage of students expected to answer correctly (0-100). 
+  **CRITICAL**: If your estimate is below 70%, you MUST verify:
+  - All four options are genuinely plausible to a non-expert
+  - No options can be eliminated through pure logic/common sense
+  - The question cannot be answered by someone clever who lacks domain knowledge
+  - Wrong answers represent actual conceptual confusions, not absurdities
+  If you cannot verify all of these, INCREASE the percentage estimate.
 
-- "reasoning": Brief rationale for the percentage assignment considering complexity, inference required, and detail recall.
+- "reasoning": Brief rationale for the percentage assignment. **If estimated_correct_pct < 70%**, you MUST explain:
+  1. What specific domain knowledge is required that common sense/logic cannot provide
+  2. Why each wrong answer would seem plausible to someone with partial understanding
+  3. What makes this question resistant to test-taking strategies
+  If you cannot provide specific explanations for all three points, your difficulty estimate is too low.
 
 All math expressions must use valid LaTeX format with $...$ for inline math and $$...$$ for display math.
 
 Return a valid JSON list of 20 questions. Focus on testing conceptual understanding rather than text memorization.
 
-If the passage contains code or table output, generate questions about how the code works and what outputs mean - but present these as general programming/analysis questions, not as references to "the code shown" or "the table above."
+If the passage contains code, mathematical derivations, or data tables, generate questions about:
+- How the logic/process works (not "what does line 5 do")
+- What results mean and why (not "what is the output")
+- When to apply methods (not "what is this method called")
+- Why approaches differ (not "which method is shown")
 
 Passage:
 {text_chunk}
@@ -229,8 +363,8 @@ def parse_question_json(text: str):
             return []
 def filter_invalid_difficulty_alignment(questions):
     bloom_difficulty_ranges = {
-        "Remember": (70, 100),
-        "Understand": (50, 85),
+        "Remember": (80, 100),
+        "Understand": (50, 90),
         "Apply": (45, 80),
         "Analyze": (25, 65),
         "Evaluate": (0, 60),
@@ -620,6 +754,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
