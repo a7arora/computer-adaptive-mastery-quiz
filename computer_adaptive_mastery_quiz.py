@@ -707,6 +707,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         if state.get("show_explanation", False):
             if state["last_correct"]:
                 st.success("✅ Correct!")
+                st.markdown(state["last_explanation"], unsafe_allow_html=True)
             else:
                 st.markdown("❌ **Incorrect.**", unsafe_allow_html=True)
                 st.markdown(state["last_explanation"], unsafe_allow_html=True)
@@ -754,6 +755,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
