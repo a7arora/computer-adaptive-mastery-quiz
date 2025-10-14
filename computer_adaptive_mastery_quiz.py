@@ -44,6 +44,13 @@ Your goal is to create questions where students CANNOT get the correct answer th
 - Guessing based on option patterns, lengths, or complexity differences
 - Recognizing what "sounds right" based on everyday language
 - Using the question wording itself as a hint to the answer
+- For questions above the remember difficulty band, questions that a student who memorizes information in the reading without true understanding can answer correctly
+
+Generate exactly 20 questions that vary across difficulty levels. Questions should test **conceptual understanding and application**, not just recall of text. Use the uploaded material to determine:
+
+1. What concepts are explicitly stated and factual: these support easy or "Remember" questions.
+2. What concepts require connecting multiple ideas or interpreting examples: these support medium or  **Understand** or **Apply** questions.
+3. What concepts require analysis of interactions, synthesis, or predicting outcomes based on material in the text → these support medium/hard and hard or **Analyze**, **Evaluate**, or **Create** questions.
 
 **For EVERY question, ensure:**
 
@@ -125,27 +132,65 @@ When estimating "estimated_correct_pct", consider that students may have:
 
 **Your difficulty estimates should reflect:**
 
-- **85-100% correct**: Direct recall of explicitly stated, simple facts with no calculation or inference
-  - Even here, ensure all four options are factually plausible
-  - Example: "What is the SI unit of force?" (if passage defined it clearly)
+85–100% correct (Very Easy / Direct Recall)
 
-- **70-84% correct**: Understanding of straightforward concepts with ONE step of reasoning
-  - Wrong answers should represent adjacent/related concepts
-  - Example: Distinguishing between related but distinct terms covered in passage
+Students can answer by recalling a fact, definition, or formula explicitly stated in the passage.
 
-- **50-69% correct**: Application to new scenarios OR multi-step reasoning
-  - Wrong answers should reflect common errors in application
-  - Requires connecting multiple concepts
-  - Example: Using a formula in a context slightly different from passage examples
+Requires no calculation, inference, or application beyond what is written.
 
-- **30-49% correct**: Analysis requiring deep understanding OR synthesis of multiple concepts
-  - Wrong answers should seem correct if you only partially understand
-  - May involve subtle distinctions or counterintuitive results
-  - Example: Predicting outcomes when multiple factors interact
+All four options must be plausible and technically correct; distractors should reflect common small misconceptions.
 
-- **Below 30%**: Evaluation/creation level tasks with genuine ambiguity
-  - Multiple answers may seem defensible
-  - Requires expert-level judgment or advanced problem-solving
+Example: “What is the SI unit of force?” (If the passage explicitly defines it.)
+
+Reasoning check: Any student who read the passage carefully and understood it should get this correct. There should be no trickiness or need for synthesis.
+
+70–84% correct (Easy / Understanding / Single-Step Reasoning)
+
+Requires one step of reasoning or minor inference beyond direct recall.
+
+Students must connect a concept in the passage to a similar context or slightly different phrasing, but it is still straightforward.
+
+Wrong answers should reflect adjacent or related concepts that a partial understanding might confuse.
+
+Example: Distinguishing between two related concepts explained in the passage, or solving a quadratic equation using a method shown in an example, but with different numbers.
+
+Reasoning check: Students need to understand the concept, but the mental load is low; a moderately attentive student can reason it out from the passage.
+
+50–69% correct (Medium / Application / Multi-Step Reasoning)
+
+Requires applying principles from the passage to a new scenario or combining multiple pieces of information.
+
+The passage does not explicitly solve this problem, so students must adapt knowledge.
+
+Distractors should be plausible errors that someone might make if they misapplied formulas, misremembered conditions, or partially understood the concept.
+
+Example: Using a formula from a passage in a context slightly different from the examples given, requiring intermediate calculations or logical steps.
+
+Reasoning check: Students must integrate knowledge, not just recall. Simple elimination of absurd answers is not sufficient.
+
+30–49% correct (Hard / Analysis / Synthesis)
+
+Requires deep understanding, integration, or analysis of multiple concepts in the passage.
+
+Students must infer relationships, compare methods, or predict outcomes not directly explained.
+
+Wrong answers should seem correct to someone with partial understanding, exploiting subtle distinctions or counterintuitive results.
+
+Example: Predicting how two interacting variables affect an outcome based on multiple sections of the passage.
+
+Reasoning check: Requires careful thinking and cannot be answered by rote memorization or simple logic alone.
+
+Below 30% correct (Very Hard / Evaluation or Creation)
+
+Requires expert-level judgment, design, or synthesis, combining multiple principles in novel ways.
+
+Multiple answers might seem defensible; students must evaluate, critique, or generate solutions based on passage principles.
+
+Distractors reflect plausible alternative interpretations, partial understanding, or common advanced mistakes.
+
+Example: Designing an experiment, predicting outcomes in a complex system, or choosing between competing strategies using principles from the passage.
+
+Reasoning check: Even strong students may struggle; requires higher-order thinking and creativity, not just reasoning from examples
 
 **IMPORTANT DIFFICULTY CHECK:**
 Before assigning estimated_correct_pct below 70%, ask yourself:
@@ -153,6 +198,7 @@ Before assigning estimated_correct_pct below 70%, ask yourself:
 2. Does the question wording hint at the answer through word associations?
 3. Are any options absurd enough that anyone would eliminate them?
 4. Could someone pattern-match (longest/most specific option is often correct)?
+5. Is the question something for which the correct answer is directly in the reading?
 
 If you answered YES to any of these, the question is easier than you think. Increase the percentage OR redesign the options.
 
@@ -755,6 +801,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
