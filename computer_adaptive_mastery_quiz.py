@@ -52,6 +52,8 @@ Generate exactly 20 questions that vary across difficulty levels. Questions shou
 2. What concepts require connecting multiple ideas or interpreting examples: these support medium or  **Understand** or **Apply** questions.
 3. What concepts require analysis of interactions, synthesis, or predicting outcomes based on material in the text → these support medium/hard and hard or **Analyze**, **Evaluate**, or **Create** questions.
 
+Use the passage to determine which concepts can be recalled, applied, analyzed, or synthesized. Do not assign difficulty randomly. 
+
 **For EVERY question, ensure:**
 
 1. **All four options are plausible to someone WITHOUT domain expertise**
@@ -801,6 +803,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
