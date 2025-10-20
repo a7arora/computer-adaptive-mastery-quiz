@@ -1,4 +1,3 @@
-
 import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
@@ -7,15 +6,10 @@ import json
 import re
 import random
 
-
-API_KEY = st.secrets["DEEPSEEK_API_KEY"]
-
-headers = {
-    "Authorization": f"Bearer {API_KEY}",
-    "Content-Type": "application/json"
-}
-DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
-MODEL_NAME = "deepseek-chat"  
+# Load Gemini API key from Streamlit secrets
+API_KEY = st.secrets["GEMINI_API_KEY"]
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+MODEL_NAME = "gemini-2.5-pro"
 
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
@@ -24,9 +18,7 @@ def extract_text_from_pdf(pdf_file):
 def generate_prompt(text_chunk):
     return f"""
 You are a teacher who is designing a test with multiple choice questions (each with 4 answer choices) to test content from a passage.
-
 Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
-
 **CRITICAL REQUIREMENT - NO TEXT REFERENCES:**
 - Questions must be COMPLETELY SELF-CONTAINED and not reference the original text
 - DO NOT use phrases like "according to the passage," "the text states," "the first example," "as mentioned," "the author discusses," etc.
@@ -35,9 +27,7 @@ Given the following passage or notes, generate exactly 20 multiple choice questi
 - Students should be able to answer based on their understanding of the concepts, not memory of where things appeared in the text
 - Frame questions as direct concept tests, not reading comprehension
 - If there is information about ISBN or ebook distribution consequences or copyrights, do not ask questions about these things. Only ask questions about academic content
-
 **CRITICAL: Design Questions That Test TRUE MASTERY, Not Test-Taking Skills**
-
 Your goal is to create questions where students CANNOT get the correct answer through:
 - Process of elimination with obviously implausible answers
 - Common sense reasoning without domain-specific knowledge
@@ -45,29 +35,22 @@ Your goal is to create questions where students CANNOT get the correct answer th
 - Recognizing what "sounds right" based on everyday language
 - Using the question wording itself as a hint to the answer
 - For questions above the remember difficulty band, questions that a student who memorizes information in the reading without true understanding can answer correctly
-
 Generate exactly 20 questions that vary across difficulty levels. Questions should test **conceptual understanding and application**, not just recall of text. Use the uploaded material to determine:
-
 1. What concepts are explicitly stated and factual: these support easy or "Remember" questions.
-2. What concepts require connecting multiple ideas or interpreting examples: these support medium or  **Understand** or **Apply** questions.
+2. What concepts require connecting multiple ideas or interpreting examples: these support medium or **Understand** or **Apply** questions.
 3. What concepts require analysis of interactions, synthesis, or predicting outcomes based on material in the text → these support medium/hard and hard or **Analyze**, **Evaluate**, or **Create** questions.
-
-Use the passage to determine which concepts can be recalled, applied, analyzed, or synthesized. Do not assign difficulty randomly. 
-
+Use the passage to determine which concepts can be recalled, applied, analyzed, or synthesized. Do not assign difficulty randomly.
 **For EVERY question, ensure:**
-
 1. **All four options are plausible to someone WITHOUT domain expertise**
    - Wrong answers should represent actual misconceptions or partial understanding
    - Avoid absurd options that anyone could eliminate (e.g., if asking about a biological process, don't include "it turns purple" as an option)
    - All options should be similar in length, specificity, and technical complexity
    - Don't mix highly technical language in one option with casual language in others
-
 2. **The question cannot be answered through linguistic/semantic clues alone**
    - Don't ask "What does [term] do?" when the term's name in everyday English reveals the answer
    - Avoid questions where the correct answer repeats key words from the question
    - Don't make the correct answer significantly more detailed/specific than wrong answers
    - Ensure wrong answers use equally precise terminology
-
 3. **Wrong answers reflect genuine confusion, not nonsense**
    - Each wrong answer should be what a student might choose if they:
      * Confused two related concepts
@@ -75,125 +58,81 @@ Use the passage to determine which concepts can be recalled, applied, analyzed, 
      * Made a common calculation error
      * Remembered only part of the concept
    - Never include options that are absurd or completely unrelated to the topic
-
 **Examples of BAD questions (too easy to guess without knowledge):**
-
 ❌ **Math**: "What is the derivative of x²?"
    - Options: A) 2x, B) Purple, C) √x, D) The number 7
    - Problem: Option B and D are absurd; anyone can eliminate them
-
 ❌ **Biology**: "What does the mitochondrion do?"
    - Options: A) Produces energy, B) Makes the cell blue, C) Stores memories, D) Nothing
    - Problem: "Mitochondrion" sounds like "might" + "power" in English; B/C/D are nonsense
-
 ❌ **Physics**: "What happens when you compress a gas at constant temperature?"
    - Options: A) Pressure increases, B) It becomes solid immediately, C) Gravity reverses, D) Mass decreases
    - Problem: B/C/D violate basic logic; correct answer follows from common sense about squeezing things
-
 ❌ **History**: "What was the primary cause of the Civil War?"
    - Options: A) Slavery and states' rights (detailed), B) Economic factors, C) Politics, D) War
    - Problem: Option A is much more specific; C and D are too vague/circular
-
 **Examples of GOOD questions (require actual domain knowledge):**
-
 ✅ **Math**: "For the function f(x) = x² - 4x + 4, what is the nature of its roots?"
    - A) Two distinct real roots
    - B) One repeated real root
-   - C) Two complex conjugate roots  
+   - C) Two complex conjugate roots
    - D) No roots exist
    - Why good: Requires discriminant calculation; all options are mathematically meaningful
-
 ✅ **Biology**: "During aerobic respiration, where does the electron transport chain occur?"
    - A) Inner mitochondrial membrane
    - B) Outer mitochondrial membrane
    - C) Mitochondrial matrix
    - D) Cristae folds exclusively
    - Why good: All are parts of mitochondria; requires specific knowledge; A and D both seem correct without deep understanding
-
 ✅ **Physics**: "A gas undergoes isothermal compression. Which statement is correct?"
    - A) Internal energy remains constant; work is done on the system
-   - B) Internal energy decreases; work is done by the system  
+   - B) Internal energy decreases; work is done by the system
    - C) Internal energy increases; no heat is exchanged
    - D) Internal energy remains constant; no work is exchanged
    - Why good: All involve thermodynamic concepts; requires understanding isothermal process properties
-
 ✅ **Chemistry**: "Which factor does NOT affect the rate of an enzyme-catalyzed reaction at optimal conditions?"
    - A) Total amount of product already formed
    - B) Substrate concentration
    - C) Enzyme concentration
    - D) Presence of competitive inhibitors
    - Why good: Three factors DO affect rate (plausible); requires understanding enzyme kinetics, not guessing
-
 **Difficulty Calibration Guidelines:**
-
 When estimating "estimated_correct_pct", consider that students may have:
 - General intelligence and test-taking skills
 - Ability to eliminate absurd options
 - Common sense reasoning
 - Pattern recognition abilities
-
 **Your difficulty estimates should reflect:**
-
 85–100% correct (Very Easy / Direct Recall)
-
 Students can answer by recalling a fact, definition, or formula explicitly stated in the passage.
-
 Requires no calculation, inference, or application beyond what is written.
-
 All four options must be plausible and technically correct; distractors should reflect common small misconceptions.
-
 Example: “What is the SI unit of force?” (If the passage explicitly defines it.)
-
 Reasoning check: Any student who read the passage carefully and understood it should get this correct. There should be no trickiness or need for synthesis.
-
 70–84% correct (Easy / Understanding / Single-Step Reasoning)
-
 Requires one step of reasoning or minor inference beyond direct recall.
-
 Students must connect a concept in the passage to a similar context or slightly different phrasing, but it is still straightforward.
-
 Wrong answers should reflect adjacent or related concepts that a partial understanding might confuse.
-
 Example: Distinguishing between two related concepts explained in the passage, or solving a quadratic equation using a method shown in an example, but with different numbers.
-
 Reasoning check: Students need to understand the concept, but the mental load is low; a moderately attentive student can reason it out from the passage.
-
 50–69% correct (Medium / Application / Multi-Step Reasoning)
-
 Requires applying principles from the passage to a new scenario or combining multiple pieces of information.
-
 The passage does not explicitly solve this problem, so students must adapt knowledge.
-
 Distractors should be plausible errors that someone might make if they misapplied formulas, misremembered conditions, or partially understood the concept.
-
 Example: Using a formula from a passage in a context slightly different from the examples given, requiring intermediate calculations or logical steps.
-
 Reasoning check: Students must integrate knowledge, not just recall. Simple elimination of absurd answers is not sufficient.
-
 30–49% correct (Hard / Analysis / Synthesis)
-
 Requires deep understanding, integration, or analysis of multiple concepts in the passage.
-
 Students must infer relationships, compare methods, or predict outcomes not directly explained.
-
 Wrong answers should seem correct to someone with partial understanding, exploiting subtle distinctions or counterintuitive results.
-
 Example: Predicting how two interacting variables affect an outcome based on multiple sections of the passage.
-
 Reasoning check: Requires careful thinking and cannot be answered by rote memorization or simple logic alone.
-
 Below 30% correct (Very Hard / Evaluation or Creation)
-
 Requires expert-level judgment, design, or synthesis, combining multiple principles in novel ways.
-
 Multiple answers might seem defensible; students must evaluate, critique, or generate solutions based on passage principles.
-
 Distractors reflect plausible alternative interpretations, partial understanding, or common advanced mistakes.
-
 Example: Designing an experiment, predicting outcomes in a complex system, or choosing between competing strategies using principles from the passage.
-
 Reasoning check: Even strong students may struggle; requires higher-order thinking and creativity, not just reasoning from examples
-
 **IMPORTANT DIFFICULTY CHECK:**
 Before assigning estimated_correct_pct below 70%, ask yourself:
 1. Could a clever person with no domain knowledge eliminate 2+ options using logic alone?
@@ -201,25 +140,18 @@ Before assigning estimated_correct_pct below 70%, ask yourself:
 3. Are any options absurd enough that anyone would eliminate them?
 4. Could someone pattern-match (longest/most specific option is often correct)?
 5. Is the question something for which the correct answer is directly in the reading?
-
 If you answered YES to any of these, the question is easier than you think. Increase the percentage OR redesign the options.
-
 **Requirements**:
 - 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard (<40%)
-
 **Each question must include the following fields:**
-
 - "question": A clear, concise, and unambiguous question that tests understanding of concepts from the passage. The question should be COMPLETELY SELF-CONTAINED with all necessary context included. Never reference "the passage," "the text," specific examples by position (first, second, etc.), or figures/tables. Ask about the concept directly.
-
 - "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D" (with one being correct). ALL four options must be similar in:
     * Length (within 20% of each other)
     * Specificity and detail level
     * Technical complexity
     * Grammatical structure
   Wrong answers must represent genuine misconceptions from the domain, not random nonsense.
-
 - "correct_answer": The letter ("A", "B", "C", or "D") corresponding to the correct option.
-
 - "explanation": A deep, pedagogically useful explanation that teaches the concept behind the correct answer. The explanation must:
     1. Start by stating the correct letter and full answer
     2. Explain WHY that answer is correct using conceptual reasoning - explain mechanisms, properties, or principles
@@ -229,52 +161,54 @@ If you answered YES to any of these, the question is easier than you think. Incr
        - What partial understanding might make it seem correct
     4. Focus on teaching the underlying concept, not referencing where information appeared in the text
     5. Use the tone of a tutor helping a student understand the concept
-
 - "cognitive_level": Choose from "Remember", "Understand", "Apply", "Analyze", "Evaluate", or "Create" based on the cognitive skill actually tested.
-
-- "estimated_correct_pct": Numeric estimate of percentage of students expected to answer correctly (0-100). 
+- "estimated_correct_pct": Numeric estimate of percentage of students expected to answer correctly (0-100).
   **CRITICAL**: If your estimate is below 70%, you MUST verify:
   - All four options are genuinely plausible to a non-expert
   - No options can be eliminated through pure logic/common sense
   - The question cannot be answered by someone clever who lacks domain knowledge
   - Wrong answers represent actual conceptual confusions, not absurdities
   If you cannot verify all of these, INCREASE the percentage estimate.
-
 - "reasoning": Brief rationale for the percentage assignment. **If estimated_correct_pct < 70%**, you MUST explain:
   1. What specific domain knowledge is required that common sense/logic cannot provide
   2. Why each wrong answer would seem plausible to someone with partial understanding
   3. What makes this question resistant to test-taking strategies
   If you cannot provide specific explanations for all three points, your difficulty estimate is too low.
-
 All math expressions must use valid LaTeX format with $...$ for inline math and $$...$$ for display math.
-
 Return a valid JSON list of 20 questions. Focus on testing conceptual understanding rather than text memorization.
-
 If the passage contains code, mathematical derivations, or data tables, generate questions about:
 - How the logic/process works (not "what does line 5 do")
 - What results mean and why (not "what is the output")
 - When to apply methods (not "what is this method called")
 - Why approaches differ (not "which method is shown")
-
 Passage:
 {text_chunk}
 """
 
-def call_deepseek_api(prompt):
-    data = {
-        "model": MODEL_NAME,
-        "messages": [
-            {"role": "system", "content": "You are a helpful educational assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.7,
-        "max_tokens": 4500
+def call_gemini_api(prompt):
+    headers = {
+        "Content-Type": "application/json"
     }
-    response = requests.post(DEEPSEEK_URL, headers=headers, json=data)
+    data = {
+        "contents": [{
+            "parts": [{
+                "text": prompt
+            }]
+        }],
+        "generationConfig": {
+            "temperature": 0.7,
+            "maxOutputTokens": 4500
+        }
+    }
+    url = f"{GEMINI_URL}?key={API_KEY}"
+    response = requests.post(url, headers=headers, json=data)
     if response.status_code != 200:
         return None, response.text
-    return response.json()["choices"][0]["message"]["content"], None
-
+    response_json = response.json()
+    try:
+        return response_json["candidates"][0]["content"]["parts"][0]["text"], None
+    except (KeyError, IndexError) as e:
+        return None, f"Failed to parse Gemini API response: {str(e)}"
 
 def clean_response_text(text: str) -> str:
     """
@@ -282,13 +216,12 @@ def clean_response_text(text: str) -> str:
     Strips ```json fences, trailing commentary, and truncates at the last bracket.
     """
     text = text.strip()
-
     # Remove ```json ... ``` fences (more flexible pattern)
     fence_patterns = [
         r"```json\s*(.*?)```",  # ```json content ```
-        r"```\s*(.*?)```",      # ``` content ```
+        r"```\s*(.*?)```",  # ``` content ```
         r"`{3,}\s*json\s*(.*?)`{3,}",  # Multiple backticks with json
-        r"`{3,}\s*(.*?)`{3,}"   # Multiple backticks without json
+        r"`{3,}\s*(.*?)`{3,}"  # Multiple backticks without json
     ]
     
     for pattern in fence_patterns:
@@ -296,16 +229,15 @@ def clean_response_text(text: str) -> str:
         if fence_match:
             text = fence_match.group(1).strip()
             break
-
+    
     # Find the JSON array boundaries
-    # Look for the first '[' and last ']'
     start_idx = text.find('[')
     end_idx = text.rfind(']')
     
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         text = text[start_idx:end_idx + 1]
         return text.strip()
-
+    
     # Fallback: look for object boundaries
     start_idx = text.find('{')
     end_idx = text.rfind('}')
@@ -313,9 +245,8 @@ def clean_response_text(text: str) -> str:
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         text = text[start_idx:end_idx + 1]
         return text.strip()
-
+    
     return text
-
 
 def repair_json(text: str) -> str:
     """
@@ -323,36 +254,28 @@ def repair_json(text: str) -> str:
     """
     # Remove trailing commas before ] or }
     text = re.sub(r',\s*([\]}])', r'\1', text)
-
     # Fix }{ into }, {
     text = re.sub(r'}\s*{', r'}, {', text)
-
     # Fix ] [ into ], [
     text = re.sub(r']\s*\[', r'], [', text)
-
     # Replace percent signs in numbers (e.g. 92% -> 92)
     text = re.sub(r'(\d+)\s*%', r'\1', text)
-
-    # Fix unescaped quotes in strings (more conservative approach)
-    # This is a simplified fix - for more complex cases, you might need a proper JSON parser
+    # Fix unescaped quotes in strings
     text = re.sub(r'(?<!\\)"([^"]*?)(?<!\\)"(?=\s*[,\]}])', lambda m: '"' + m.group(1).replace('"', '\\"') + '"', text)
     
     # Ensure the text starts with [ if it looks like an array
     text = text.strip()
     if not text.startswith('[') and not text.startswith('{'):
-        # Try to find the start of JSON
         json_start = re.search(r'[\[{]', text)
         if json_start:
             text = text[json_start.start():]
     
     return text
 
-
 def parse_question_json(text: str):
     """
     Parse JSON with better error handling and debugging
     """
-    # Print raw text for debugging
     print(f"Raw API response length: {len(text)}")
     print(f"Raw API response (first 200 chars): {text[:200]}")
     
@@ -362,7 +285,7 @@ def parse_question_json(text: str):
     
     cleaned = repair_json(cleaned)
     print(f"Repaired text (first 200 chars): {cleaned[:200]}")
-
+    
     # Try standard JSON parsing first
     try:
         result = json.loads(cleaned)
@@ -371,7 +294,7 @@ def parse_question_json(text: str):
     except json.JSONDecodeError as e:
         print(f"Standard JSON parsing failed: {e}")
         
-        # Try json5 as fallback (more lenient parsing)
+        # Try json5 as fallback
         try:
             import json5
             result = json5.loads(cleaned)
@@ -380,11 +303,9 @@ def parse_question_json(text: str):
         except Exception as e2:
             print(f"JSON5 parsing also failed: {e2}")
             
-            # Final fallback: try to extract individual questions manually
+            # Final fallback: extract individual questions manually
             try:
-                # Look for question objects and try to parse them individually
                 questions = []
-                # Split by question boundaries and try to parse each
                 question_pattern = r'\{\s*"question":[^}]*?"reasoning":[^}]*?\}'
                 potential_questions = re.findall(question_pattern, cleaned, re.DOTALL)
                 
@@ -401,7 +322,6 @@ def parse_question_json(text: str):
             except:
                 pass
             
-            # Log the error with more context
             st.error("⚠️ JSON parse failed:")
             st.error(f"Standard JSON error: {e}")
             st.error(f"JSON5 error: {e2}")
@@ -409,6 +329,7 @@ def parse_question_json(text: str):
             st.text(cleaned[:1000])
             
             return []
+
 def filter_invalid_difficulty_alignment(questions):
     bloom_difficulty_ranges = {
         "Remember": (80, 100),
@@ -418,21 +339,17 @@ def filter_invalid_difficulty_alignment(questions):
         "Evaluate": (0, 60),
         "Create": (0, 50)
     }
-
     valid = []
     invalid = []
-
     for q in questions:
-        if not isinstance(q, dict):  # skip anything not a dict
+        if not isinstance(q, dict):
             invalid.append(q)
             continue
-
         cog = str(q.get("cognitive_level", "")).strip().capitalize()
         try:
             pct = int(q.get("estimated_correct_pct", -1))
         except Exception:
             pct = -1
-
         if cog in bloom_difficulty_ranges and 0 <= pct <= 100:
             low, high = bloom_difficulty_ranges[cog]
             if low <= pct <= high:
@@ -441,7 +358,6 @@ def filter_invalid_difficulty_alignment(questions):
                 invalid.append(q)
         else:
             invalid.append(q)
-
     return valid, invalid
 
 def assign_difficulty_label(estimated_pct):
@@ -474,8 +390,6 @@ def pick_question(diff, asked, all_qs):
 
 def find_next_difficulty(current_diff, going_up, asked, all_qs):
     next_diff = current_diff + 1 if going_up else current_diff - 1
-
-    # Try one step in intended direction
     if 1 <= next_diff <= 8 and pick_question(next_diff, asked, all_qs):
         return next_diff
     search_range = (
@@ -485,6 +399,7 @@ def find_next_difficulty(current_diff, going_up, asked, all_qs):
         if pick_question(d, asked, all_qs):
             return d
     return current_diff
+
 def get_next_question(current_diff, asked, all_qs):
     available = pick_question(current_diff, asked, all_qs)
     if not available:
@@ -495,42 +410,36 @@ def get_next_question(current_diff, asked, all_qs):
 def accuracy_on_levels(answers, levels):
     filtered = [c for d, c in answers if d in levels]
     return sum(filtered) / len(filtered) if filtered else 0
+
 def compute_mastery_score(answers):
-    #limits mastery scores based on difficulty attempted
     mastery_bands = {
         (1, 2): 25,
         (3, 4): 65,
         (5, 6): 85,
         (7, 8): 100
     }
-
-    min_attempts_required = 3 
+    min_attempts_required = 3
     band_scores = []
-
     for levels, weight in mastery_bands.items():
         relevant = [correct for d, correct in answers if d in levels]
         attempts = len(relevant)
-
         if attempts == 0:
-            continue  
-        #does not give mastery points for guessing, especially on hard questions
+            continue
         acc = sum(relevant) / attempts
-        normalized_score = max((acc - 0.25) / 0.75, 0) 
-
+        normalized_score = max((acc - 0.25) / 0.75, 0)
         if attempts < min_attempts_required:
             scaled_score = normalized_score * weight * (attempts / min_attempts_required)
             band_scores.append(scaled_score)
         else:
             band_score = normalized_score * weight
             band_scores.append(band_score)
-
     if not band_scores:
-        return 0  
-
+        return 0
     return int(round(max(band_scores)))
 
-#app frontend
+# App frontend
 st.title("AscendQuiz")
+
 def render_mastery_bar(score):
     if score < 30:
         color = "#dc3545"  # red
@@ -541,14 +450,11 @@ def render_mastery_bar(score):
     else:
         color = "#28a745"  # green
         text_color = "white"
-
     st.markdown(f"""
     <style>
-        /* Hide Streamlit's default header padding */
         .stApp {{
             padding-top: 70px;
         }}
-        
         .mastery-bar-wrapper {{
             position: fixed;
             top: 0;
@@ -561,7 +467,6 @@ def render_mastery_bar(score):
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
             border-bottom: 1px solid #ddd;
         }}
-        
         .mastery-bar {{
             border: 2px solid #ccc;
             border-radius: 8px;
@@ -571,7 +476,6 @@ def render_mastery_bar(score):
             background-color: #f0f0f0;
             position: relative;
         }}
-        
         .mastery-bar-fill {{
             height: 100%;
             width: {score}%;
@@ -581,7 +485,6 @@ def render_mastery_bar(score):
             top: 0;
             left: 0;
         }}
-        
         .mastery-bar-text {{
             position: absolute;
             top: 0;
@@ -598,7 +501,6 @@ def render_mastery_bar(score):
             text-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }}
     </style>
-
     <div class="mastery-bar-wrapper">
         <div style="font-size: 12px; margin-bottom: 4px; color: #666; font-weight: 500;">
             Mastery Progress
@@ -610,32 +512,22 @@ def render_mastery_bar(score):
     </div>
     """, unsafe_allow_html=True)
 
-
 if "all_questions" not in st.session_state:
     st.markdown("""
 Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
-
 **How it works:**
 This app uses a large language model (LLM) and an adaptive difficulty engine to create multiple-choice questions from your uploaded notes or textbook excerpts. These questions are labeled with how likely students are to answer them correctly, allowing precise control over quiz difficulty.
-
 The quiz adapts in real-time based on your performance. Starting at a medium level, each correct answer raises the difficulty, while incorrect answers lower it — just like the GRE or ALEKS. Once your **mastery score reaches 70% or higher** (calculated using your accuracy weighted by difficulty level), the system considers you to have achieved **mastery** and ends the quiz.
-
 Each question includes:
 - Four answer options
 - The correct answer
 - An explanation
 - A predicted correctness percentage
-
 Unlike static tools like Khanmigo, this app uses generative AI to dynamically create the quiz from **your own content** — no rigid question banks required.
-
 ---
-
-**Built using the DeepSeek-R1-0528 model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. Please keep in mind that it currently takes about 4-5 minutes to generate questions from a pdf... please be patient as it generates questions. Furthermore, it only accepts text output and cannot read handwriting or drawings at this time.
-
+**Built using the Gemini 2.5 Pro model**, this app is a proof-of-concept showing what modern AI can do for personalized education. It blends mastery learning, real-time feedback, and adaptive testing into one clean experience. Please keep in mind that it currently takes about 4-5 minutes to generate questions from a pdf... please be patient as it generates questions. Furthermore, it only accepts text output and cannot read handwriting or drawings at this time.
 ---
 """)
-
-
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
@@ -645,14 +537,12 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 grouped_chunks = ["\n\n".join(chunks)]  # Treat as one full chunk
             else:
                 grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
-
             all_questions = []
             # Pick first 2 chunks or duplicate the first if only one exists
             chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
-
             for chunk in chunks_to_use:
                 prompt = generate_prompt(chunk)
-                response_text, error = call_deepseek_api(prompt)
+                response_text, error = call_gemini_api(prompt)
                 if error:
                     st.error("API error: " + error)
                     continue
@@ -681,11 +571,9 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 st.rerun()
             else:
                 st.error("No questions were generated.")
-
 elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
     all_qs = st.session_state.questions_by_difficulty
     state = st.session_state.get("quiz_state", None)
-
     if state is None:
         st.warning("Quiz state not found. Please restart the app or re-upload a PDF.")
         st.stop()
@@ -700,30 +588,23 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 state["current_q"] = q
                 state["current_q_idx"] = idx
                 state["current_difficulty"] = diff
-
     if not state["quiz_end"] and state["current_q"]:
         q = state["current_q"]
         idx = state["current_q_idx"]
-
         st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
         st.markdown(q["question"], unsafe_allow_html=True)
         def strip_leading_label(text):
-            # Removes A), A., A:, A - etc.
             return re.sub(r"^[A-Da-d][\).:\-]?\s+", "", text).strip()
-
         option_labels = ["A", "B", "C", "D"]
         cleaned_options = [strip_leading_label(opt) for opt in q["options"]]
         rendered_options = []
         for label, text in zip(option_labels, cleaned_options):
-            # Wrap LaTeX content in markdown with inline math if any '$' is present
             if "$" in text or "\\" in text:
                 rendered_text = f"{label}. $${text}$$"
             else:
                 rendered_text = f"{label}. {text}"
             rendered_options.append(rendered_text)
-
         selected = st.radio("Select your answer:", options=rendered_options, key=f"radio_{idx}", index=None)
-
         if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
             if selected is None:
                 st.warning("Please select an answer before submitting.")
@@ -736,22 +617,15 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                     st.error("⚠️ Question error: Correct answer letter invalid.")
                     state["quiz_end"] = True
                     st.stop()
-
                 correct = (selected_letter == correct_letter)
-
-                # Record answer
                 state["asked"].add((state["current_difficulty"], idx))
                 state["answers"].append((state["current_difficulty"], correct))
                 state["last_correct"] = correct
                 state["last_explanation"] = q["explanation"]
                 state["show_explanation"] = True
-
-                # Update mastery score according to quiz question
                 score = compute_mastery_score(state["answers"])
-                #end when students reach mastery at 70/100
                 if score >= 70:
                     state["quiz_end"] = True
-
         if state.get("show_explanation", False):
             if state["last_correct"]:
                 st.success("✅ Correct!")
@@ -759,33 +633,27 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             else:
                 st.markdown("❌ **Incorrect.**", unsafe_allow_html=True)
                 st.markdown(state["last_explanation"], unsafe_allow_html=True)
-
             if st.button("Next Question"):
-                # Adjust difficulty
                 def find_next_difficulty(current_diff, going_up, asked, all_qs):
                     diffs = range(current_diff + 1, 9) if going_up else range(current_diff - 1, 0, -1)
                     for d in diffs:
                         if pick_question(d, asked, all_qs):
                             return d
-                    return current_diff  # fallback to current if no higher/lower available
-
-                # Adjust difficulty based on performance, scaffolding learning and challenging students
+                    return current_diff
                 if state["last_correct"]:
                     state["current_difficulty"] = find_next_difficulty(
-                    state["current_difficulty"], going_up=True, asked=state["asked"], all_qs=all_qs
+                        state["current_difficulty"], going_up=True, asked=state["asked"], all_qs=all_qs
                     )
                 else:
                     state["current_difficulty"] = find_next_difficulty(
-                    state["current_difficulty"], going_up=False, asked=state["asked"], all_qs=all_qs
+                        state["current_difficulty"], going_up=False, asked=state["asked"], all_qs=all_qs
                     )
-                # Clear current question to trigger fetching a new one
                 state["current_q"] = None
                 state["current_q_idx"] = None
                 state["show_explanation"] = False
                 state["last_correct"] = None
                 state["last_explanation"] = None
                 st.rerun()
-
     elif state["quiz_end"]:
         acc = accuracy_on_levels(state["answers"], [5, 6, 7, 8])
         hard_attempts = len([1 for d, _ in state["answers"] if d >= 5])
@@ -794,7 +662,6 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             st.success(f"🎉 You have mastered the content! Your mastery score is {score}%. Great job!")
         else:
             st.warning(f"Mastery not yet achieved. Your mastery score is {score}%. Review the material and try again.")
-
         if "all_questions" in st.session_state:
             all_qs_json = json.dumps(st.session_state.all_questions, indent=2)
             st.download_button(
@@ -803,21 +670,3 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
