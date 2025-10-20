@@ -1,5 +1,5 @@
 import streamlit as st
-import fitz  # PyMuPDF
+import fitz # PyMuPDF
 import pandas as pd
 import requests
 import json
@@ -11,9 +11,76 @@ API_KEY = st.secrets["GEMINI_API_KEY"]
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
 MODEL_NAME = "gemini-2.5-pro"
 
+def estimate_tokens(text):
+    """
+    Rough token estimation: ~4 characters per token
+    More accurate would be to use tiktoken, but this is a simple approximation
+    """
+    return len(text) // 4
+
 def extract_text_from_pdf(pdf_file):
+    """Extract all text from PDF as a single string"""
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-    return [page.get_text() for page in doc if page.get_text().strip()]
+    all_text = ""
+    for page in doc:
+        page_text = page.get_text()
+        if page_text.strip():
+            all_text += page_text + "\n\n"
+    return all_text
+
+def chunk_text_by_tokens(text, chunk_size=50000):
+    """
+    Split text into chunks of approximately chunk_size tokens.
+    Returns a list of text chunks.
+    """
+    total_tokens = estimate_tokens(text)
+    
+    # If total tokens <= chunk_size, return as single chunk
+    if total_tokens <= chunk_size:
+        return [text]
+    
+    # If total tokens <= 2 * chunk_size, split into 2 chunks
+    if total_tokens <= 2 * chunk_size:
+        mid_point = len(text) // 2
+        # Try to split at a paragraph boundary near the middle
+        search_start = max(0, mid_point - 1000)
+        search_end = min(len(text), mid_point + 1000)
+        paragraph_break = text.find("\n\n", search_start, search_end)
+        
+        if paragraph_break != -1:
+            split_point = paragraph_break
+        else:
+            split_point = mid_point
+        
+        return [text[:split_point].strip(), text[split_point:].strip()]
+    
+    # If total tokens > 2 * chunk_size, create all chunks then randomly select 2
+    chunks = []
+    current_pos = 0
+    target_chunk_chars = chunk_size * 4  # Convert tokens to approximate characters
+    
+    while current_pos < len(text):
+        end_pos = min(current_pos + target_chunk_chars, len(text))
+        
+        # Try to split at paragraph boundary
+        if end_pos < len(text):
+            search_start = max(current_pos, end_pos - 1000)
+            paragraph_break = text.find("\n\n", search_start, end_pos + 1000)
+            
+            if paragraph_break != -1 and paragraph_break > current_pos:
+                end_pos = paragraph_break
+        
+        chunk = text[current_pos:end_pos].strip()
+        if chunk:
+            chunks.append(chunk)
+        
+        current_pos = end_pos
+    
+    # Randomly select 2 chunks from all available chunks
+    if len(chunks) >= 2:
+        return random.sample(chunks, 2)
+    else:
+        return chunks
 
 def generate_prompt(text_chunk):
     return f"""
@@ -107,7 +174,7 @@ When estimating "estimated_correct_pct", consider that students may have:
 Students can answer by recalling a fact, definition, or formula explicitly stated in the passage.
 Requires no calculation, inference, or application beyond what is written.
 All four options must be plausible and technically correct; distractors should reflect common small misconceptions.
-Example: “What is the SI unit of force?” (If the passage explicitly defines it.)
+Example: "What is the SI unit of force?" (If the passage explicitly defines it.)
 Reasoning check: Any student who read the passage carefully and understood it should get this correct. There should be no trickiness or need for synthesis.
 70–84% correct (Easy / Understanding / Single-Step Reasoning)
 Requires one step of reasoning or minor inference beyond direct recall.
@@ -214,39 +281,39 @@ def call_gemini_api(prompt):
 def clean_response_text(text: str) -> str:
     """
     Extracts the JSON part from a model response.
-    Strips ```json fences, trailing commentary, and truncates at the last bracket.
+    Strips ```json blocks
     """
     text = text.strip()
     # Remove ```json ... ``` fences (more flexible pattern)
     fence_patterns = [
-        r"```json\s*(.*?)```",  # ```json content ```
-        r"```\s*(.*?)```",  # ``` content ```
-        r"`{3,}\s*json\s*(.*?)`{3,}",  # Multiple backticks with json
-        r"`{3,}\s*(.*?)`{3,}"  # Multiple backticks without json
+        r"```json\s*(.*?)```", # ```json content ```
+        r"```\s*(.*?)```", # ``` content ```
+        r"`{3,}\s*json\s*(.*?)`{3,}", # Multiple backticks with json
+        r"`{3,}\s*(.*?)`{3,}" # Multiple backticks without json
     ]
-    
+   
     for pattern in fence_patterns:
         fence_match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
         if fence_match:
             text = fence_match.group(1).strip()
             break
-    
+   
     # Find the JSON array boundaries
     start_idx = text.find('[')
     end_idx = text.rfind(']')
-    
+   
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         text = text[start_idx:end_idx + 1]
         return text.strip()
-    
+   
     # Fallback: look for object boundaries
     start_idx = text.find('{')
     end_idx = text.rfind('}')
-    
+   
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         text = text[start_idx:end_idx + 1]
         return text.strip()
-    
+   
     return text
 
 def repair_json(text: str) -> str:
@@ -263,14 +330,14 @@ def repair_json(text: str) -> str:
     text = re.sub(r'(\d+)\s*%', r'\1', text)
     # Fix unescaped quotes in strings
     text = re.sub(r'(?<!\\)"([^"]*?)(?<!\\)"(?=\s*[,\]}])', lambda m: '"' + m.group(1).replace('"', '\\"') + '"', text)
-    
+   
     # Ensure the text starts with [ if it looks like an array
     text = text.strip()
     if not text.startswith('[') and not text.startswith('{'):
         json_start = re.search(r'[\[{]', text)
         if json_start:
             text = text[json_start.start():]
-    
+   
     return text
 
 def parse_question_json(text: str):
@@ -279,14 +346,14 @@ def parse_question_json(text: str):
     """
     print(f"Raw API response length: {len(text)}")
     print(f"Raw API response (first 200 chars): {text[:200]}")
-    
+   
     cleaned = clean_response_text(text)
     print(f"Cleaned text length: {len(cleaned)}")
     print(f"Cleaned text (first 200 chars): {cleaned[:200]}")
-    
+   
     cleaned = repair_json(cleaned)
     print(f"Repaired text (first 200 chars): {cleaned[:200]}")
-    
+   
     # Try standard JSON parsing first
     try:
         result = json.loads(cleaned)
@@ -294,7 +361,7 @@ def parse_question_json(text: str):
         return result
     except json.JSONDecodeError as e:
         print(f"Standard JSON parsing failed: {e}")
-        
+       
         # Try json5 as fallback
         try:
             import json5
@@ -303,32 +370,32 @@ def parse_question_json(text: str):
             return result
         except Exception as e2:
             print(f"JSON5 parsing also failed: {e2}")
-            
+           
             # Final fallback: extract individual questions manually
             try:
                 questions = []
                 question_pattern = r'\{\s*"question":[^}]*?"reasoning":[^}]*?\}'
                 potential_questions = re.findall(question_pattern, cleaned, re.DOTALL)
-                
+               
                 for q_text in potential_questions:
                     try:
                         q_obj = json.loads(q_text)
                         questions.append(q_obj)
                     except:
                         continue
-                
+               
                 if questions:
                     print(f"Manual extraction successful: {len(questions)} questions")
                     return questions
             except:
                 pass
-            
+           
             st.error("⚠️ JSON parse failed:")
             st.error(f"Standard JSON error: {e}")
             st.error(f"JSON5 error: {e2}")
             st.text("Raw cleaned text (first 1000 chars):")
             st.text(cleaned[:1000])
-            
+           
             return []
 
 def filter_invalid_difficulty_alignment(questions):
@@ -443,13 +510,13 @@ st.title("AscendQuiz")
 
 def render_mastery_bar(score):
     if score < 30:
-        color = "#dc3545"  # red
+        color = "#dc3545" # red
         text_color = "white"
     elif score < 70:
-        color = "#ffc107"  # yellow
+        color = "#ffc107" # yellow
         text_color = "black"
     else:
-        color = "#28a745"  # green
+        color = "#28a745" # green
         text_color = "white"
     st.markdown(f"""
     <style>
@@ -532,143 +599,26 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
-            chunks = extract_text_from_pdf(uploaded_pdf)
-            # Adaptive chunking
-            if len(chunks) <= 2:
-                grouped_chunks = ["\n\n".join(chunks)]  # Treat as one full chunk
-            else:
-                grouped_chunks = ["\n\n".join(chunks[i:i+4]) for i in range(0, len(chunks), 4)]
+            # Extract all text from PDF
+            full_text = extract_text_from_pdf(uploaded_pdf)
+            
+            # Chunk the text based on tokens (50k token chunks)
+            text_chunks = chunk_text_by_tokens(full_text, chunk_size=50000)
+            
+            # Display info about chunks
+            total_tokens = estimate_tokens(full_text)
+            st.info(f"PDF contains approximately {total_tokens:,} tokens. Processing {len(text_chunks)} chunk(s).")
+            
             all_questions = []
-            # Pick first 2 chunks or duplicate the first if only one exists
-            chunks_to_use = grouped_chunks[:2] if len(grouped_chunks) >= 2 else [grouped_chunks[0], grouped_chunks[0]]
-            for chunk in chunks_to_use:
+            
+            # Process each chunk
+            for i, chunk in enumerate(text_chunks):
+                chunk_tokens = estimate_tokens(chunk)
+                st.info(f"Processing chunk {i+1}/{len(text_chunks)} (~{chunk_tokens:,} tokens)...")
+                
                 prompt = generate_prompt(chunk)
                 response_text, error = call_gemini_api(prompt)
                 if error:
-                    st.error("API error: " + error)
+                    st.error(f"API error on chunk {i+1}: " + error)
                     continue
-                parsed = parse_question_json(response_text)
-                valid, invalid = filter_invalid_difficulty_alignment(parsed)
-                all_questions.extend(valid)
-                if "filtered_questions" not in st.session_state:
-                    st.session_state.filtered_questions = []
-                st.session_state.filtered_questions.extend(invalid)
-            if all_questions:
-                st.session_state.all_questions = all_questions
-                st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
-                st.session_state.quiz_state = {
-                    "current_difficulty": 4,
-                    "asked": set(),
-                    "answers": [],
-                    "quiz_end": False,
-                    "current_q_idx": None,
-                    "current_q": None,
-                    "show_explanation": False,
-                    "last_correct": None,
-                    "last_explanation": None,
-                }
-                st.success("✅ Questions generated! Starting the quiz...")
-                st.session_state.quiz_ready = True
-                st.rerun()
-            else:
-                st.error("No questions were generated.")
-elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
-    all_qs = st.session_state.questions_by_difficulty
-    state = st.session_state.get("quiz_state", None)
-    if state is None:
-        st.warning("Quiz state not found. Please restart the app or re-upload a PDF.")
-        st.stop()
-    score = compute_mastery_score(state.get("answers", []))
-    render_mastery_bar(score)
-    if not state["quiz_end"]:
-        if state["current_q"] is None and not state.get("show_explanation", False):
-            diff, idx, q = get_next_question(state["current_difficulty"], state["asked"], all_qs)
-            if q is None:
-                state["quiz_end"] = True
-            else:
-                state["current_q"] = q
-                state["current_q_idx"] = idx
-                state["current_difficulty"] = diff
-    if not state["quiz_end"] and state["current_q"]:
-        q = state["current_q"]
-        idx = state["current_q_idx"]
-        st.markdown(f"### Question (Difficulty {state['current_difficulty']})")
-        st.markdown(q["question"], unsafe_allow_html=True)
-        def strip_leading_label(text):
-            return re.sub(r"^[A-Da-d][\).:\-]?\s+", "", text).strip()
-        option_labels = ["A", "B", "C", "D"]
-        cleaned_options = [strip_leading_label(opt) for opt in q["options"]]
-        rendered_options = []
-        for label, text in zip(option_labels, cleaned_options):
-            if "$" in text or "\\" in text:
-                rendered_text = f"{label}. $${text}$$"
-            else:
-                rendered_text = f"{label}. {text}"
-            rendered_options.append(rendered_text)
-        selected = st.radio("Select your answer:", options=rendered_options, key=f"radio_{idx}", index=None)
-        if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
-            if selected is None:
-                st.warning("Please select an answer before submitting.")
-            else:
-                selected_letter = selected.split(".")[0].strip().upper()
-                letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
-                correct_letter = q["correct_answer"].strip().upper()
-                correct_index = letter_to_index.get(correct_letter, None)
-                if correct_index is None:
-                    st.error("⚠️ Question error: Correct answer letter invalid.")
-                    state["quiz_end"] = True
-                    st.stop()
-                correct = (selected_letter == correct_letter)
-                state["asked"].add((state["current_difficulty"], idx))
-                state["answers"].append((state["current_difficulty"], correct))
-                state["last_correct"] = correct
-                state["last_explanation"] = q["explanation"]
-                state["show_explanation"] = True
-                score = compute_mastery_score(state["answers"])
-                if score >= 70:
-                    state["quiz_end"] = True
-        if state.get("show_explanation", False):
-            if state["last_correct"]:
-                st.success("✅ Correct!")
-                st.markdown(state["last_explanation"], unsafe_allow_html=True)
-            else:
-                st.markdown("❌ **Incorrect.**", unsafe_allow_html=True)
-                st.markdown(state["last_explanation"], unsafe_allow_html=True)
-            if st.button("Next Question"):
-                def find_next_difficulty(current_diff, going_up, asked, all_qs):
-                    diffs = range(current_diff + 1, 9) if going_up else range(current_diff - 1, 0, -1)
-                    for d in diffs:
-                        if pick_question(d, asked, all_qs):
-                            return d
-                    return current_diff
-                if state["last_correct"]:
-                    state["current_difficulty"] = find_next_difficulty(
-                        state["current_difficulty"], going_up=True, asked=state["asked"], all_qs=all_qs
-                    )
-                else:
-                    state["current_difficulty"] = find_next_difficulty(
-                        state["current_difficulty"], going_up=False, asked=state["asked"], all_qs=all_qs
-                    )
-                state["current_q"] = None
-                state["current_q_idx"] = None
-                state["show_explanation"] = False
-                state["last_correct"] = None
-                state["last_explanation"] = None
-                st.rerun()
-    elif state["quiz_end"]:
-        acc = accuracy_on_levels(state["answers"], [5, 6, 7, 8])
-        hard_attempts = len([1 for d, _ in state["answers"] if d >= 5])
-        st.markdown("## Quiz Completed 🎉")
-        if score >= 70:
-            st.success(f"🎉 You have mastered the content! Your mastery score is {score}%. Great job!")
-        else:
-            st.warning(f"Mastery not yet achieved. Your mastery score is {score}%. Review the material and try again.")
-        if "all_questions" in st.session_state:
-            all_qs_json = json.dumps(st.session_state.all_questions, indent=2)
-            st.download_button(
-                label="📥 Download All Quiz Questions (JSON)",
-                data=all_qs_json,
-                file_name="ascendquiz_questions.json",
-                mime="application/json"
-            )
-
+                parsed =
