@@ -530,7 +530,6 @@ def render_mastery_bar(score):
         </div>
     </div>
     """, unsafe_allow_html=True)
-
 if "all_questions" not in st.session_state:
     st.markdown("""
 Welcome to your personalized learning assistant — an AI-powered tool that transforms any PDF into a mastery-based, computer-adaptive quiz.
@@ -693,3 +692,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
