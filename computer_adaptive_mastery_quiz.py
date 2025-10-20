@@ -15,23 +15,32 @@ def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
     return [page.get_text() for page in doc if page.get_text().strip()]
 
-def chunk_pages(page_texts, max_tokens=10000):
-    approx_chars_per_token = 4
-    max_chars = max_tokens * approx_chars_per_token
-    chunks = []
-    current_chunk = []
-    current_chars = 0
-    for page in page_texts:
-        page_chars = len(page)
-        if current_chars + page_chars > max_chars and current_chunk:
-            chunks.append("\n\n".join(current_chunk))
-            current_chunk = []
-            current_chars = 0
-        current_chunk.append(page)
-        current_chars += page_chars
-    if current_chunk:
-        chunks.append("\n\n".join(current_chunk))
-    return chunks
+def get_chunks_by_token(pages):
+    """
+    Chunks the extracted PDF text based on a 50,000 token limit per chunk.
+
+    - If total tokens <= 50k, it returns one chunk.
+    - If total tokens <= 100k, it returns two chunks.
+    - If total tokens > 100k, it randomly selects two chunks.
+    """
+    # Combine all page text into a single string
+    full_text = "\n\n".join(pages)
+
+    # Approximate token count, assuming 1 token is about 4 characters
+    TOKEN_CHUNK_SIZE = 10000 * 4
+    
+    # Create all possible chunks from the full text
+    all_text_chunks = [full_text[i:i + TOKEN_CHUNK_SIZE] for i in range(0, len(full_text), TOKEN_CHUNK_SIZE)]
+    
+    num_chunks = len(all_text_chunks)
+
+    if num_chunks <= 2:
+        # If the text results in one or two chunks (<= 100k tokens), use them all.
+        return all_text_chunks
+    else:
+        # If there are more than two chunks (> 100k tokens), pick two at random.
+        return random.sample(all_text_chunks, 2)
+
 
 def generate_prompt(text_chunk):
     return f"""
@@ -237,34 +246,34 @@ def clean_response_text(text: str) -> str:
     text = text.strip()
     # Remove ```json ... ``` fences (more flexible pattern)
     fence_patterns = [
-        r"```json\s*(.*?)```", # ```json content ```
-        r"```\s*(.*?)```", # ``` content ```
-        r"`{3,}\s*json\s*(.*?)`{3,}", # Multiple backticks with json
-        r"`{3,}\s*(.*?)`{3,}" # Multiple backticks without json
+        r"```json\s*(.*?)```",  # ```json content ```
+        r"```\s*(.*?)```",  # ``` content ```
+        r"`{3,}\s*json\s*(.*?)`{3,}",  # Multiple backticks with json
+        r"`{3,}\s*(.*?)`{3,}"  # Multiple backticks without json
     ]
-   
+    
     for pattern in fence_patterns:
         fence_match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
         if fence_match:
             text = fence_match.group(1).strip()
             break
-   
+    
     # Find the JSON array boundaries
     start_idx = text.find('[')
     end_idx = text.rfind(']')
-   
+    
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         text = text[start_idx:end_idx + 1]
         return text.strip()
-   
+    
     # Fallback: look for object boundaries
     start_idx = text.find('{')
     end_idx = text.rfind('}')
-   
+    
     if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
         text = text[start_idx:end_idx + 1]
         return text.strip()
-   
+    
     return text
 
 def repair_json(text: str) -> str:
@@ -281,14 +290,14 @@ def repair_json(text: str) -> str:
     text = re.sub(r'(\d+)\s*%', r'\1', text)
     # Fix unescaped quotes in strings
     text = re.sub(r'(?<!\\)"([^"]*?)(?<!\\)"(?=\s*[,\]}])', lambda m: '"' + m.group(1).replace('"', '\\"') + '"', text)
-   
+    
     # Ensure the text starts with [ if it looks like an array
     text = text.strip()
     if not text.startswith('[') and not text.startswith('{'):
         json_start = re.search(r'[\[{]', text)
         if json_start:
             text = text[json_start.start():]
-   
+    
     return text
 
 def parse_question_json(text: str):
@@ -297,14 +306,14 @@ def parse_question_json(text: str):
     """
     print(f"Raw API response length: {len(text)}")
     print(f"Raw API response (first 200 chars): {text[:200]}")
-   
+    
     cleaned = clean_response_text(text)
     print(f"Cleaned text length: {len(cleaned)}")
     print(f"Cleaned text (first 200 chars): {cleaned[:200]}")
-   
+    
     cleaned = repair_json(cleaned)
     print(f"Repaired text (first 200 chars): {cleaned[:200]}")
-   
+    
     # Try standard JSON parsing first
     try:
         result = json.loads(cleaned)
@@ -312,7 +321,7 @@ def parse_question_json(text: str):
         return result
     except json.JSONDecodeError as e:
         print(f"Standard JSON parsing failed: {e}")
-       
+        
         # Try json5 as fallback
         try:
             import json5
@@ -321,32 +330,32 @@ def parse_question_json(text: str):
             return result
         except Exception as e2:
             print(f"JSON5 parsing also failed: {e2}")
-           
+            
             # Final fallback: extract individual questions manually
             try:
                 questions = []
                 question_pattern = r'\{\s*"question":[^}]*?"reasoning":[^}]*?\}'
                 potential_questions = re.findall(question_pattern, cleaned, re.DOTALL)
-               
+                
                 for q_text in potential_questions:
                     try:
                         q_obj = json.loads(q_text)
                         questions.append(q_obj)
                     except:
                         continue
-               
+                
                 if questions:
                     print(f"Manual extraction successful: {len(questions)} questions")
                     return questions
             except:
                 pass
-           
+            
             st.error("⚠️ JSON parse failed:")
             st.error(f"Standard JSON error: {e}")
             st.error(f"JSON5 error: {e2}")
             st.text("Raw cleaned text (first 1000 chars):")
             st.text(cleaned[:1000])
-           
+            
             return []
 
 def filter_invalid_difficulty_alignment(questions):
@@ -461,13 +470,13 @@ st.title("AscendQuiz")
 
 def render_mastery_bar(score):
     if score < 30:
-        color = "#dc3545" # red
+        color = "#dc3545"  # red
         text_color = "white"
     elif score < 70:
-        color = "#ffc107" # yellow
+        color = "#ffc107"  # yellow
         text_color = "black"
     else:
-        color = "#28a745" # green
+        color = "#28a745"  # green
         text_color = "white"
     st.markdown(f"""
     <style>
@@ -550,20 +559,15 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
-            page_texts = extract_text_from_pdf(uploaded_pdf)
-            grouped_chunks = chunk_pages(page_texts)
-            num_chunks = len(grouped_chunks)
-            if num_chunks == 0:
-                st.error("No text extracted from PDF.")
-                st.stop()
-            elif num_chunks == 1:
-                chunks_to_use = [grouped_chunks[0], grouped_chunks[0]]
-            elif num_chunks == 2:
-                chunks_to_use = grouped_chunks
-            else:
-                chunks_to_use = random.sample(grouped_chunks, 2)
+            pages = extract_text_from_pdf(uploaded_pdf)
+            
+            # This is the new token-based chunking logic
+            chunks_to_use = get_chunks_by_token(pages)
+
             all_questions = []
             for chunk in chunks_to_use:
+                if not chunk.strip(): # Skip empty chunks
+                    continue
                 prompt = generate_prompt(chunk)
                 response_text, error = call_gemini_api(prompt)
                 if error:
@@ -575,6 +579,7 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 if "filtered_questions" not in st.session_state:
                     st.session_state.filtered_questions = []
                 st.session_state.filtered_questions.extend(invalid)
+
             if all_questions:
                 st.session_state.all_questions = all_questions
                 st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
@@ -632,7 +637,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             if selected is None:
                 st.warning("Please select an answer before submitting.")
             else:
-                selected_letter = selected.split(".")[0].strip().upper()
+                selected_letter = selected.split(".").strip().upper()
                 letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
                 correct_letter = q["correct_answer"].strip().upper()
                 correct_index = letter_to_index.get(correct_letter, None)
@@ -678,7 +683,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 state["last_explanation"] = None
                 st.rerun()
     elif state["quiz_end"]:
-        acc = accuracy_on_levels(state["answers"], [5, 6, 7, 8])
+        acc = accuracy_on_levels(state["answers"],)
         hard_attempts = len([1 for d, _ in state["answers"] if d >= 5])
         st.markdown("## Quiz Completed 🎉")
         if score >= 70:
@@ -693,9 +698,3 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
-
-
-
-
-
-
