@@ -280,30 +280,51 @@ def clean_response_text(text: str) -> str:
     return text
 
 def repair_json(text: str) -> str:
+    """
+    Repairs model-generated JSON output that may be truncated or malformed.
+    Ensures valid array syntax and removes dangling commas.
+    """
     text = re.sub(r'```(?:json)?', '', text)
     text = text.replace('```', '').strip()
 
+    # Keep only the JSON-like section
     start = text.find('[')
     end = text.rfind(']')
     if start != -1 and end != -1:
         text = text[start:end + 1]
     else:
+        # fallback for single object JSON
         start = text.find('{')
         end = text.rfind('}')
         if start != -1 and end != -1:
-            text = text[start:end + 1]
+            text = f"[{text[start:end + 1]}]"
 
-    # 🩹 NEW FIX: truncate any trailing incomplete object
-    last_brace = text.rfind('}')
-    if last_brace != -1:
-        text = text[:last_brace + 1]
-    text = re.sub(r',\s*([\]}])', r'\1', text)
+    # --- Critical fix: ensure clean object separation ---
+    # 1. Remove incomplete trailing objects (missing closing brace)
+    open_braces = text.count('{')
+    close_braces = text.count('}')
+    if close_braces < open_braces:
+        # trim off the incomplete last object
+        last_full = text.rfind('}')
+        if last_full != -1:
+            text = text[:last_full + 1]
+        text += "]" if not text.endswith(']') else ""
+
+    # 2. Fix any "}, {" merges without comma or bracket
     text = re.sub(r'}\s*{', '}, {', text)
 
-    if text.startswith('{') and text.endswith('}'):
-        text = f'[{text}]'
+    # 3. Remove trailing commas before closing brackets
+    text = re.sub(r',\s*([\]}])', r'\1', text)
 
+    # 4. Ensure the array starts and ends properly
+    if not text.startswith('['):
+        text = '[' + text
+    if not text.endswith(']'):
+        text = text + ']'
+
+    # Final clean trim
     return text.strip()
+
 
 
 def parse_question_json(text: str):
@@ -704,6 +725,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
