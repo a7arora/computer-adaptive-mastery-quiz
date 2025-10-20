@@ -203,12 +203,15 @@ If you answered YES to any of these, the question is easier than you think. Incr
   If you cannot provide specific explanations for all three points, your difficulty estimate is too low.
 All math expressions must use valid LaTeX format with $...$ for inline math and $$...$$ for display math.
 Before finalizing each question, verify that the correct answer and every explanation are explicitly supported by factual information or definitions present in the passage. Please make sure that every correct answer is clearly correct and every incorrect answer is clearly incorrect.
-Return a valid JSON list of 20 questions. Focus on testing conceptual understanding rather than text memorization.
+ Focus on testing conceptual understanding rather than text memorization.
 If the passage contains code, mathematical derivations, or data tables, generate questions about:
 - How the logic/process works (not "what does line 5 do")
 - What results mean and why (not "what is the output")
 - When to apply methods (not "what is this method called")
 - Why approaches differ (not "which method is shown")
+Return **only** a valid JSON array of 20 questions.  Focus on testing conceptual understanding rather than text memorization. 
+Do not include any text, commentary, or markdown fences. 
+Output must begin with `[` and end with `]` — no explanations outside JSON.
 Passage:
 {text_chunk}
 """
@@ -277,39 +280,31 @@ def clean_response_text(text: str) -> str:
     return text
 
 def repair_json(text: str) -> str:
-    """
-    Repairs common JSON formatting issues and truncates extra content.
-    """
-    # Remove code fences or markdown
     text = re.sub(r'```(?:json)?', '', text)
     text = text.replace('```', '').strip()
 
-    # Remove any leading or trailing junk outside brackets
     start = text.find('[')
     end = text.rfind(']')
     if start != -1 and end != -1:
         text = text[start:end + 1]
     else:
-        # Try single object
         start = text.find('{')
         end = text.rfind('}')
         if start != -1 and end != -1:
             text = text[start:end + 1]
 
-    # Remove trailing commas
+    # 🩹 NEW FIX: truncate any trailing incomplete object
+    last_brace = text.rfind('}')
+    if last_brace != -1:
+        text = text[:last_brace + 1]
     text = re.sub(r',\s*([\]}])', r'\1', text)
-
-    # Add commas between adjacent objects if missing
     text = re.sub(r'}\s*{', '}, {', text)
 
-    # Ensure it's a JSON array
     if text.startswith('{') and text.endswith('}'):
         text = f'[{text}]'
 
-    # Strip any leftover commentary
-    text = re.sub(r'[\r\n]+.*$', '', text)
-
     return text.strip()
+
 
 def parse_question_json(text: str):
     """
@@ -709,5 +704,6 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
