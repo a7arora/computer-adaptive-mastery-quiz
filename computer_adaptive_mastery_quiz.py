@@ -225,7 +225,7 @@ def call_gemini_api(prompt):
         }],
         "generationConfig": {
             "temperature": 0.7,
-            "maxOutputTokens": 4500
+            "maxOutputTokens": 7500
         }
     }
     url = f"{GEMINI_URL}?key={API_KEY}"
@@ -709,4 +709,5 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
