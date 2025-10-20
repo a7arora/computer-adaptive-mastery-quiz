@@ -1,5 +1,3 @@
-import sys, traceback
-st.set_option('client.showErrorDetails', True)
 import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
@@ -695,4 +693,5 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
