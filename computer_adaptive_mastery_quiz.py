@@ -175,6 +175,7 @@ If you answered YES to any of these, the question is easier than you think. Incr
   3. What makes this question resistant to test-taking strategies
   If you cannot provide specific explanations for all three points, your difficulty estimate is too low.
 All math expressions must use valid LaTeX format with $...$ for inline math and $$...$$ for display math.
+Before finalizing each question, verify that the correct answer and every explanation are explicitly supported by factual information or definitions present in the passage. Please make sure that every correct answer is clearly correct and every incorrect answer is clearly incorrect.
 Return a valid JSON list of 20 questions. Focus on testing conceptual understanding rather than text memorization.
 If the passage contains code, mathematical derivations, or data tables, generate questions about:
 - How the logic/process works (not "what does line 5 do")
@@ -670,3 +671,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
