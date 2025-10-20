@@ -717,7 +717,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 state["last_explanation"] = None
                 st.rerun()
     elif state["quiz_end"]:
-        acc = accuracy_on_levels(state["answers"],)
+        acc = accuracy_on_levels(state["answers"], [5, 6, 7, 8])
         hard_attempts = len([1 for d, _ in state["answers"] if d >= 5])
         st.markdown("## Quiz Completed 🎉")
         if score >= 70:
@@ -732,6 +732,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
