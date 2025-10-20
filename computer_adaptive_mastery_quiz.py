@@ -5,6 +5,7 @@ import requests
 import json
 import re
 import random
+import json5
 
 # Load Gemini API key from Streamlit secrets
 API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -746,3 +747,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
