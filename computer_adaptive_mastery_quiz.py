@@ -15,7 +15,7 @@ def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
     return [page.get_text() for page in doc if page.get_text().strip()]
 
-def chunk_pages(page_texts, max_tokens=50000):
+def chunk_pages(page_texts, max_tokens=10000):
     approx_chars_per_token = 4
     max_chars = max_tokens * approx_chars_per_token
     chunks = []
@@ -693,6 +693,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
