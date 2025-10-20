@@ -671,7 +671,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             if selected is None:
                 st.warning("Please select an answer before submitting.")
             else:
-                selected_letter = selected.split(".").strip().upper()
+                selected_letter = selected.split(".")[0].strip().upper()
                 letter_to_index = {"A": 0, "B": 1, "C": 2, "D": 3}
                 correct_letter = q["correct_answer"].strip().upper()
                 correct_index = letter_to_index.get(correct_letter, None)
@@ -732,6 +732,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
