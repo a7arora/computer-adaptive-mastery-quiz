@@ -278,27 +278,38 @@ def clean_response_text(text: str) -> str:
 
 def repair_json(text: str) -> str:
     """
-    Repairs common JSON formatting issues
+    Repairs common JSON formatting issues and truncates extra content.
     """
-    # Remove trailing commas before ] or }
+    # Remove code fences or markdown
+    text = re.sub(r'```(?:json)?', '', text)
+    text = text.replace('```', '').strip()
+
+    # Remove any leading or trailing junk outside brackets
+    start = text.find('[')
+    end = text.rfind(']')
+    if start != -1 and end != -1:
+        text = text[start:end + 1]
+    else:
+        # Try single object
+        start = text.find('{')
+        end = text.rfind('}')
+        if start != -1 and end != -1:
+            text = text[start:end + 1]
+
+    # Remove trailing commas
     text = re.sub(r',\s*([\]}])', r'\1', text)
-    # Fix }{ into }, {
-    text = re.sub(r'}\s*{', r'}, {', text)
-    # Fix ] [ into ], [
-    text = re.sub(r']\s*\[', r'], [', text)
-    # Replace percent signs in numbers (e.g. 92% -> 92)
-    text = re.sub(r'(\d+)\s*%', r'\1', text)
-    # Fix unescaped quotes in strings
-    text = re.sub(r'(?<!\\)"([^"]*?)(?<!\\)"(?=\s*[,\]}])', lambda m: '"' + m.group(1).replace('"', '\\"') + '"', text)
-    
-    # Ensure the text starts with [ if it looks like an array
-    text = text.strip()
-    if not text.startswith('[') and not text.startswith('{'):
-        json_start = re.search(r'[\[{]', text)
-        if json_start:
-            text = text[json_start.start():]
-    
-    return text
+
+    # Add commas between adjacent objects if missing
+    text = re.sub(r'}\s*{', '}, {', text)
+
+    # Ensure it's a JSON array
+    if text.startswith('{') and text.endswith('}'):
+        text = f'[{text}]'
+
+    # Strip any leftover commentary
+    text = re.sub(r'[\r\n]+.*$', '', text)
+
+    return text.strip()
 
 def parse_question_json(text: str):
     """
@@ -698,3 +709,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
