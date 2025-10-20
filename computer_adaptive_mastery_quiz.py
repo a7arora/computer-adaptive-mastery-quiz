@@ -172,7 +172,14 @@ If you answered YES to any of these, the question is easier than you think. Incr
 - 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard (<40%)
 **Each question must include the following fields:**
 - "question": A clear, concise, and unambiguous question that tests understanding of concepts from the passage. The question should be COMPLETELY SELF-CONTAINED with all necessary context included. Never reference "the passage," "the text," specific examples by position (first, second, etc.), or figures/tables. Ask about the concept directly.
-- "options": A list of 4 plausible answer choices labeled "A", "B", "C", and "D" (with one being correct). ALL four options must be similar in:
+- - "options": An array of exactly 4 strings in this exact format:
+    [
+      "A. [First option text]",
+      "B. [Second option text]", 
+      "C. [Third option text]",
+      "D. [Fourth option text]"
+    ]
+  Each string must start with the letter and period. Do not use an object/dictionary structure. It is 4 plausible answer choices labeled "A", "B", "C", and "D" (with one being correct). ALL four options must be similar in:
     * Length (within 20% of each other)
     * Specificity and detail level
     * Technical complexity
@@ -725,6 +732,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
