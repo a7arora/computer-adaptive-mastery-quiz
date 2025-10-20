@@ -1,87 +1,37 @@
 import streamlit as st
-import fitz # PyMuPDF
+import fitz  # PyMuPDF
 import pandas as pd
 import requests
 import json
 import re
 import random
-import json5
 
 # Load Gemini API key from Streamlit secrets
 API_KEY = st.secrets["GEMINI_API_KEY"]
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
 MODEL_NAME = "gemini-2.5-pro"
 
-def estimate_tokens(text):
-    """
-    Rough token estimation: ~4 characters per token
-    More accurate would be to use tiktoken, but this is a simple approximation
-    """
-    return len(text) // 4
-
 def extract_text_from_pdf(pdf_file):
-    """Extract all text from PDF as a single string"""
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-    all_text = ""
-    for page in doc:
-        page_text = page.get_text()
-        if page_text.strip():
-            all_text += page_text + "\n\n"
-    return all_text
+    return [page.get_text() for page in doc if page.get_text().strip()]
 
-def chunk_text_by_tokens(text, chunk_size=50000):
-    """
-    Split text into chunks of approximately chunk_size tokens.
-    Returns a list of text chunks.
-    """
-    total_tokens = estimate_tokens(text)
-    
-    # If total tokens <= chunk_size, return as single chunk
-    if total_tokens <= chunk_size:
-        return [text]
-    
-    # If total tokens <= 2 * chunk_size, split into 2 chunks
-    if total_tokens <= 2 * chunk_size:
-        mid_point = len(text) // 2
-        # Try to split at a paragraph boundary near the middle
-        search_start = max(0, mid_point - 1000)
-        search_end = min(len(text), mid_point + 1000)
-        paragraph_break = text.find("\n\n", search_start, search_end)
-        
-        if paragraph_break != -1:
-            split_point = paragraph_break
-        else:
-            split_point = mid_point
-        
-        return [text[:split_point].strip(), text[split_point:].strip()]
-    
-    # If total tokens > 2 * chunk_size, create all chunks then randomly select 2
+def chunk_pages(page_texts, max_tokens=50000):
+    approx_chars_per_token = 4
+    max_chars = max_tokens * approx_chars_per_token
     chunks = []
-    current_pos = 0
-    target_chunk_chars = chunk_size * 4  # Convert tokens to approximate characters
-    
-    while current_pos < len(text):
-        end_pos = min(current_pos + target_chunk_chars, len(text))
-        
-        # Try to split at paragraph boundary
-        if end_pos < len(text):
-            search_start = max(current_pos, end_pos - 1000)
-            paragraph_break = text.find("\n\n", search_start, end_pos + 1000)
-            
-            if paragraph_break != -1 and paragraph_break > current_pos:
-                end_pos = paragraph_break
-        
-        chunk = text[current_pos:end_pos].strip()
-        if chunk:
-            chunks.append(chunk)
-        
-        current_pos = end_pos
-    
-    # Randomly select 2 chunks from all available chunks
-    if len(chunks) >= 2:
-        return random.sample(chunks, 2)
-    else:
-        return chunks
+    current_chunk = []
+    current_chars = 0
+    for page in page_texts:
+        page_chars = len(page)
+        if current_chars + page_chars > max_chars and current_chunk:
+            chunks.append("\n\n".join(current_chunk))
+            current_chunk = []
+            current_chars = 0
+        current_chunk.append(page)
+        current_chars += page_chars
+    if current_chunk:
+        chunks.append("\n\n".join(current_chunk))
+    return chunks
 
 def generate_prompt(text_chunk):
     return f"""
@@ -175,7 +125,7 @@ When estimating "estimated_correct_pct", consider that students may have:
 Students can answer by recalling a fact, definition, or formula explicitly stated in the passage.
 Requires no calculation, inference, or application beyond what is written.
 All four options must be plausible and technically correct; distractors should reflect common small misconceptions.
-Example: "What is the SI unit of force?" (If the passage explicitly defines it.)
+Example: “What is the SI unit of force?” (If the passage explicitly defines it.)
 Reasoning check: Any student who read the passage carefully and understood it should get this correct. There should be no trickiness or need for synthesis.
 70–84% correct (Easy / Understanding / Single-Step Reasoning)
 Requires one step of reasoning or minor inference beyond direct recall.
@@ -282,7 +232,7 @@ def call_gemini_api(prompt):
 def clean_response_text(text: str) -> str:
     """
     Extracts the JSON part from a model response.
-    Strips ```json blocks
+    Strips ```json fences, trailing commentary, and truncates at the last bracket.
     """
     text = text.strip()
     # Remove ```json ... ``` fences (more flexible pattern)
@@ -600,27 +550,24 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
     uploaded_pdf = st.file_uploader("Upload class notes (PDF)", type="pdf")
     if uploaded_pdf:
         with st.spinner("Generating questions..."):
-            # Extract all text from PDF
-            full_text = extract_text_from_pdf(uploaded_pdf)
-            
-            # Chunk the text based on tokens (50k token chunks)
-            text_chunks = chunk_text_by_tokens(full_text, chunk_size=50000)
-            
-            # Display info about chunks
-            total_tokens = estimate_tokens(full_text)
-            st.info(f"PDF contains approximately {total_tokens:,} tokens. Processing {len(text_chunks)} chunk(s).")
-            
+            page_texts = extract_text_from_pdf(uploaded_pdf)
+            grouped_chunks = chunk_pages(page_texts)
+            num_chunks = len(grouped_chunks)
+            if num_chunks == 0:
+                st.error("No text extracted from PDF.")
+                st.stop()
+            elif num_chunks == 1:
+                chunks_to_use = [grouped_chunks[0], grouped_chunks[0]]
+            elif num_chunks == 2:
+                chunks_to_use = grouped_chunks
+            else:
+                chunks_to_use = random.sample(grouped_chunks, 2)
             all_questions = []
-            
-            # Process each chunk
-            for i, chunk in enumerate(text_chunks):
-                chunk_tokens = estimate_tokens(chunk)
-                st.info(f"Processing chunk {i+1}/{len(text_chunks)} (~{chunk_tokens:,} tokens)...")
-                
+            for chunk in chunks_to_use:
                 prompt = generate_prompt(chunk)
                 response_text, error = call_gemini_api(prompt)
                 if error:
-                    st.error(f"API error on chunk {i+1}: " + error)
+                    st.error("API error: " + error)
                     continue
                 parsed = parse_question_json(response_text)
                 valid, invalid = filter_invalid_difficulty_alignment(parsed)
@@ -628,7 +575,6 @@ Unlike static tools like Khanmigo, this app uses generative AI to dynamically cr
                 if "filtered_questions" not in st.session_state:
                     st.session_state.filtered_questions = []
                 st.session_state.filtered_questions.extend(invalid)
-            
             if all_questions:
                 st.session_state.all_questions = all_questions
                 st.session_state.questions_by_difficulty = group_by_difficulty(all_questions)
@@ -677,7 +623,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
         rendered_options = []
         for label, text in zip(option_labels, cleaned_options):
             if "$" in text or "\\" in text:
-                rendered_text = f"{label}. ${text}$"
+                rendered_text = f"{label}. $${text}$$"
             else:
                 rendered_text = f"{label}. {text}"
             rendered_options.append(rendered_text)
@@ -747,4 +693,3 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
-
