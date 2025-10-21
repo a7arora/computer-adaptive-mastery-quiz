@@ -17,11 +17,11 @@ def extract_text_from_pdf(pdf_file):
 
 def get_chunks_by_token(pages):
     """
-    Chunks the extracted PDF text based on a 50,000 token limit per chunk.
+    Chunks the extracted PDF text based on a 10,000 token limit per chunk.
 
-    - If total tokens <= 50k, it returns one chunk.
-    - If total tokens <= 100k, it returns two chunks.
-    - If total tokens > 100k, it randomly selects two chunks.
+    - If total tokens <= 10k, it returns one chunk.
+    - If total tokens <= 20k, it returns two chunks.
+    - If total tokens > 20k, it randomly selects two chunks.
     """
     # Combine all page text into a single string
     full_text = "\n\n".join(pages)
@@ -731,6 +731,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
