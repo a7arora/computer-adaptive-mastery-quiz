@@ -98,6 +98,9 @@ Use the passage to determine which concepts can be recalled, applied, analyzed, 
 ❌ **History**: "What was the primary cause of the Civil War?"
    - Options: A) Slavery and states' rights (detailed), B) Economic factors, C) Politics, D) War
    - Problem: Option A is much more specific; C and D are too vague/circular
+❌ **Computer Science**: Question: What is the primary function of an 'exchange argument' in a proof of correctness for a greedy algorithm? A. To prove that the greedy algorithm is more efficient than a brute-force approach. B. To demonstrate that any optimal solution can be transformed into another optimal solution that includes the first greedy choice. C. To show that every non-greedy choice made at any step will inevitably lead to a suboptimal final solution. D. To calculate the performance bound of the greedy algorithm compared to the optimal solution.
+- Problem: When someone sees the term exchange argument, they would believe that it aligns with this answer choice "To demonstrate that any optimal solution can be transformed into another optimal solution that includes the first greedy choice." because transforming one solution into another is exchanging one solution into another, so someone who is clever enough can infer the correct answer from the choices without actual knowledge of the concepts covered in the course just from the name.
+
 **Examples of GOOD questions (require actual domain knowledge):**
 ✅ **Math**: "For the function f(x) = x² - 4x + 4, what is the nature of its roots?"
    - A) Two distinct real roots
@@ -734,6 +737,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
