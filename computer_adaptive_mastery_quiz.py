@@ -162,7 +162,7 @@ Example: Designing an experiment, predicting outcomes in a complex system, or ch
 Reasoning check: Even strong students may struggle; requires higher-order thinking and creativity, not just reasoning from examples
 
 You have a tendency to think questions are harder than they really are for students and think that the distractors are much better than they really are, so please keep that in mind when generating questions, especially for medium-hard and hard questions. Really try to make the medium-hard and hard questions require deep mastery of the material beyond what is expected of students who typically study material at this level and not just be simple applications of the material. Really try to make the distractors good enough so that students would not even guess on the question if there was negative marking schemes in exams like the older SAT or AMC 10. 
-
+Please do your best to make the hardest questions truly super difficult, even for students who are well prepared and at top schools/universities, while also making sure that they are correct
 **IMPORTANT DIFFICULTY CHECK:**
 Before assigning estimated_correct_pct below 70%, ask yourself:
 1. Could a clever person with no domain knowledge eliminate 2+ options using logic alone?
@@ -734,6 +734,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
