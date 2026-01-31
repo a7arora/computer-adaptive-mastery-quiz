@@ -505,8 +505,50 @@ def compute_mastery_score(answers):
         return 0
     return int(round(max(band_scores)))
 
-# App frontend
-st.title("AscendQuiz")
+# Adding a banner title with rocket emoji
+st.markdown('<h1 class="main-title">🚀 AscendQuiz</h1>', unsafe_allow_html=True)
+
+# Styling block that locks the answer selection after submitting an answer
+st.markdown("""
+    <style>
+        /* Prevent the labels of disabled radio buttons from dimming */
+        div[data-testid="stRadio"] > div[role="radiogroup"] > label [data-testid="stWidgetLabel"] p {
+            opacity: 1 !important;
+            color: inherit !important;
+        }
+        
+        /* Optional: Keep the radio options themselves clear while disabled */
+        div[data-testid="stRadio"] label {
+            opacity: 1 !important;
+        }
+
+        /* Keep the selected option text bold even when locked */
+        div[data-testid="stRadio"] input[checked] + div p {
+            font-weight: 600;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Styling block for overall UI, slight background gradient
+st.markdown("""
+    <style>
+        .stApp {
+            background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%);
+        }
+        .main-title {
+            color: #2e4a7d;
+            font-size: 3rem !important;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        div[data-testid="stRadio"] > div[role="radiogroup"] > label [data-testid="stWidgetLabel"] p {
+            opacity: 1 !important;
+            color: inherit !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 def render_mastery_bar(score):
     if score < 30:
@@ -671,8 +713,8 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             else:
                 rendered_text = f"{label}. {text}"
             rendered_options.append(rendered_text)
-        selected = st.radio("Select your answer:", options=rendered_options, key=f"radio_{idx}", index=None)
-        if st.button("Submit Answer", key=f"submit_{idx}") and not state.get("show_explanation", False):
+        selected = st.radio("Select your answer:", options=rendered_options, key=f"radio_{idx}", index=None, disabled=state.get("show_explanation", False))
+        if st.button("Submit Answer", key=f"submit_{idx}", disabled=state.get("show_explanation", False)):
             if selected is None:
                 st.warning("Please select an answer before submitting.")
             else:
@@ -693,6 +735,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 score = compute_mastery_score(state["answers"])
                 if score >= 70:
                     state["quiz_end"] = True
+                st.rerun()
         if state.get("show_explanation", False):
             if state["last_correct"]:
                 st.success("✅ Correct!")
@@ -729,6 +772,40 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
             st.success(f"🎉 You have mastered the content! Your mastery score is {score}%. Great job!")
         else:
             st.warning(f"Mastery not yet achieved. Your mastery score is {score}%. Review the material and try again.")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("🔄 Retry Quiz", use_container_width=True):
+                # Reset only the quiz progress state while keeping the generated questions
+                st.session_state.quiz_state = {
+                    "current_difficulty": 4,
+                    "asked": set(),
+                    "answers": [],
+                    "quiz_end": False,
+                    "current_q_idx": None,
+                    "current_q": None,
+                    "show_explanation": False,
+                    "last_correct": None,
+                    "last_explanation": None,
+                }
+                st.rerun()
+
+        with col2:
+            if st.button("🏠 Home", use_container_width=True):
+                # Clear all session data to return to the PDF upload screen
+                keys_to_clear = [
+                    "all_questions", 
+                    "questions_by_difficulty", 
+                    "quiz_state", 
+                    "quiz_ready", 
+                    "filtered_questions"
+                ]
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                st.rerun()
+
         if "all_questions" in st.session_state:
             all_qs_json = json.dumps(st.session_state.all_questions, indent=2)
             st.download_button(
@@ -737,18 +814,5 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
