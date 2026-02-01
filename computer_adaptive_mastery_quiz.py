@@ -543,9 +543,20 @@ st.markdown("""
             margin-bottom: 2rem;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
         }
+        /* Keep radio options visible when disabled */
         div[data-testid="stRadio"] > div[role="radiogroup"] > label [data-testid="stWidgetLabel"] p {
             opacity: 1 !important;
-            color: inherit !important;
+            color: #1f1f1f !important;  /* Change this to a specific dark color */
+        }
+        
+        /* Keep the radio options themselves clear */
+        div[data-testid="stRadio"] label {
+            opacity: 1 !important;
+        }
+
+        /* Keep the selected option text bold even when locked */
+        div[data-testid="stRadio"] input[checked] + div p {
+            font-weight: 600;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -814,5 +825,6 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
