@@ -534,29 +534,26 @@ st.markdown("""
     <style>
         .stApp {
             background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%);
+            color: #1f1f1f; /* Explicitly set default text to dark grey */
         }
+        
+        /* Ensure all headers, markdown, and labels are visible */
+        .stApp h1, .stApp h2, .stApp h3, .stApp p, .stApp span, .stApp label {
+            color: #1f1f1f !important;
+        }
+
         .main-title {
-            color: #2e4a7d;
+            color: #2e4a7d !important; /* Keep your specific blue for the title */
             font-size: 3rem !important;
             font-weight: 800;
             text-align: center;
             margin-bottom: 2rem;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
         }
-        /* Keep radio options visible when disabled */
-        div[data-testid="stRadio"] > div[role="radiogroup"] > label [data-testid="stWidgetLabel"] p {
-            opacity: 1 !important;
-            color: #1f1f1f !important;  /* Change this to a specific dark color */
-        }
-        
-        /* Keep the radio options themselves clear */
-        div[data-testid="stRadio"] label {
-            opacity: 1 !important;
-        }
 
-        /* Keep the selected option text bold even when locked */
-        div[data-testid="stRadio"] input[checked] + div p {
-            font-weight: 600;
+        /* Fix for radio buttons and other widgets */
+        div[data-testid="stRadio"] label p {
+            color: #1f1f1f !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -825,4 +822,5 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
