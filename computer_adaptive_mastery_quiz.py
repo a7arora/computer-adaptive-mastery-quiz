@@ -6,43 +6,10 @@ import json
 import re
 import random
 
-import streamlit as st
-
-# ADD THIS CSS BLOCK - Force all text to be visible
-
-st.markdown("""
-    <style>
-        /* Only target markdown text (questions & explanations) */
-        .stMarkdown p, .stMarkdown span, .stMarkdown li {
-            color: #1f1f1f !important;
-            opacity: 1 !important;
-        }
-        
-        /* Target radio button options specifically - but NOT other labels */
-        div[data-testid="stRadio"] label [data-testid="stWidgetLabel"] p {
-            color: #1f1f1f !important;
-            opacity: 1 !important;
-        }
-        
-        /* Fix for disabled radio buttons after submission */
-        div[data-testid="stRadio"] label[data-disabled="true"] [data-testid="stWidgetLabel"] p {
-            color: #1f1f1f !important;
-            opacity: 1 !important;
-        }
-        
-        /* Ensure explanation text is visible */
-        .element-container .stMarkdown p {
-            color: #1f1f1f !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 # Load Gemini API key from Streamlit secrets
 API_KEY = st.secrets["GEMINI_API_KEY"]
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
 MODEL_NAME = "gemini-2.5-pro"
-
-
 
 def extract_text_from_pdf(pdf_file):
     doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
@@ -858,8 +825,4 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
-
-
-
-
 
