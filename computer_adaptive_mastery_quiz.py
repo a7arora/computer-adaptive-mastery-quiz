@@ -9,32 +9,29 @@ import random
 import streamlit as st
 
 # ADD THIS CSS BLOCK - Force all text to be visible
+
 st.markdown("""
     <style>
-        /* Force ALL text in the app to be dark by default */
-        .stApp, .stMarkdown, p, div, span, label {
+        /* Only target markdown text (questions & explanations) */
+        .stMarkdown p, .stMarkdown span, .stMarkdown li {
             color: #1f1f1f !important;
+            opacity: 1 !important;
         }
         
-        /* Specific fix for radio button options */
+        /* Target radio button options specifically - but NOT other labels */
         div[data-testid="stRadio"] label [data-testid="stWidgetLabel"] p {
             color: #1f1f1f !important;
             opacity: 1 !important;
         }
         
-        /* Fix for disabled radio buttons (after submission) */
+        /* Fix for disabled radio buttons after submission */
         div[data-testid="stRadio"] label[data-disabled="true"] [data-testid="stWidgetLabel"] p {
             color: #1f1f1f !important;
             opacity: 1 !important;
         }
         
-        /* Ensure question text is visible even with HTML content */
-        .stMarkdown p {
-            color: #1f1f1f !important;
-        }
-        
-        /* Fix for explanation text */
-        .element-container p {
+        /* Ensure explanation text is visible */
+        .element-container .stMarkdown p {
             color: #1f1f1f !important;
         }
     </style>
@@ -861,6 +858,7 @@ elif "quiz_ready" in st.session_state and st.session_state.quiz_ready:
                 file_name="ascendquiz_questions.json",
                 mime="application/json"
             )
+
 
 
 
