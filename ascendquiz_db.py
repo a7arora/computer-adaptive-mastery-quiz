@@ -208,8 +208,10 @@ def get_chunks_by_token(pages):
 
 # ============== QUESTION GENERATION ==============
 
-def generate_prompt(text_chunk):
+def generate_prompt(text_chunk, difficulty_mode="Medium"):
     """Generate the detailed pedagogical prompt for Gemini to create quiz questions."""
+    easy, medium, medium_hard, hard = DIFFICULTY_DISTRIBUTIONS[difficulty_mode]
+    dist_line = f"- {easy} easy (≥85%), {medium} medium (60–84%), {medium_hard} medium-hard (40-60%), {hard} hard (<40%)"
     return f"""
 You are a teacher who is designing a test with multiple choice questions (each with 4 answer choices) to test content from a passage.
 Given the following passage or notes, generate exactly 30 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
@@ -280,7 +282,7 @@ Requires expert-level judgment, design, or synthesis, combining multiple princip
 Multiple answers might seem defensible; students must evaluate, critique, or generate solutions based on passage principles.
 Distractors reflect plausible alternative interpretations, partial understanding, or common advanced mistakes.
 **Requirements**:
-- 8 easy (≥85%), 7 medium (60–84%), 8 medium-hard (40-60%), 7 hard (<40%)
+{dist_line}
 **Each question must include the following fields:**
 - "question": A clear, concise, and unambiguous question that tests understanding of concepts from the passage. The question should be COMPLETELY SELF-CONTAINED with all necessary context included. Never reference "the passage," "the text," specific examples by position (first, second, etc.), or figures/tables. Ask about the concept directly.
 - "options": An array of exactly 4 strings in this exact format:
@@ -857,6 +859,20 @@ def compute_mastery_score(answers):
 
     return int(round(max(0.0, min(100.0, raw_score))))
 
+# ============== DIFFICULTY SETTINGS ==============
+
+DIFFICULTY_DISTRIBUTIONS = {
+    "Easy":   (12, 10, 6,  2),
+    "Medium": (8,  7,  8,  7),
+    "Hard":   (2,  6,  10, 12),
+}
+
+DIFFICULTY_START_TIER = {
+    "Easy": 2,
+    "Medium": 4,
+    "Hard": 7,
+}
+
 # ============== UI COMPONENTS ==============
 
 def render_login_page():
@@ -1035,7 +1051,7 @@ def render_quiz():
                     if not chunk.strip():
                         continue
                     tip_placeholder.info(f"💡 {random.choice(LOADING_TIPS)}")
-                    prompt = generate_prompt(chunk)
+                    prompt = generate_prompt(chunk, st.session_state.get("difficulty_mode", "Medium"))
                     response_text, error = call_gemini_api(prompt)
                     if error:
                         st.error(f"API error: {error}")
@@ -1069,7 +1085,7 @@ def render_quiz():
                 st.session_state.quiz_mode = "pdf"
                 st.session_state.quiz_active = True
                 st.session_state.quiz_state = {
-                    "current_difficulty": 4,
+                    "current_difficulty": DIFFICULTY_START_TIER.get(st.session_state.get("difficulty_mode", "Medium"), 4),
                     "asked": set(),
                     "answers": [],
                     "quiz_end": False,
@@ -1114,6 +1130,15 @@ def render_quiz():
         uploaded_pdf = st.file_uploader("Upload your PDF", type=["pdf"], key="pdf_uploader")
 
         if uploaded_pdf:
+            difficulty_mode = st.radio(
+                "Quiz Difficulty",
+                ["Easy", "Medium", "Hard"],
+                index=1,
+                horizontal=True,
+                key="difficulty_selector",
+            )
+            st.session_state.difficulty_mode = difficulty_mode
+
             if st.button("🚀 Generate Quiz", use_container_width=True):
                 # Show spinner with rotating tips
                 tip_placeholder = st.empty()
@@ -1138,7 +1163,7 @@ def render_quiz():
                             if not chunk.strip():
                                 continue
                             tip_placeholder.info(f"💡 {random.choice(LOADING_TIPS)}")
-                            prompt = generate_prompt(chunk)
+                            prompt = generate_prompt(chunk, st.session_state.get("difficulty_mode", "Medium"))
                             response_text, error = call_gemini_api(prompt)
                             if error:
                                 st.error(f"API error: {error}")
@@ -1168,7 +1193,7 @@ def render_quiz():
                         st.session_state.quiz_mode = "pdf"
                         st.session_state.quiz_active = True
                         st.session_state.quiz_state = {
-                            "current_difficulty": 4,
+                            "current_difficulty": DIFFICULTY_START_TIER.get(st.session_state.get("difficulty_mode", "Medium"), 4),
                             "asked": set(),
                             "answers": [],
                             "quiz_end": False,
@@ -1212,7 +1237,7 @@ def render_quiz():
             st.session_state.quiz_mode = "demo"
             st.session_state.quiz_active = True
             st.session_state.quiz_state = {
-                "current_difficulty": 4,
+                "current_difficulty": DIFFICULTY_START_TIER.get(st.session_state.get("difficulty_mode", "Medium"), 4),
                 "asked": set(),
                 "answers": [],
                 "quiz_end": False,
@@ -1436,7 +1461,7 @@ def render_quiz_complete():
             if st.button("🔄 Retry Same Questions", use_container_width=True):
                 # Reset quiz state but keep questions
                 st.session_state.quiz_state = {
-                    "current_difficulty": 4,
+                    "current_difficulty": DIFFICULTY_START_TIER.get(st.session_state.get("difficulty_mode", "Medium"), 4),
                     "asked": set(),
                     "answers": [],
                     "quiz_end": False,
