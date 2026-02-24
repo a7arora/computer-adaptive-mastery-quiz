@@ -941,109 +941,36 @@ def render_dashboard():
     stats = get_user_stats(user_id)
     
     col1, col2, col3, col4 = st.columns(4)
-    
     with col1:
-        total = stats["overall"]["total_quizzes"] or 0
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    padding: 20px; border-radius: 10px; text-align: center; color: white;">
-            <h1 style="margin:0; font-size: 2.5em;">{total}</h1>
-            <p style="margin:0;">Quizzes Taken</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
+        st.metric("Quizzes Taken", stats["overall"]["total_quizzes"] or 0)
     with col2:
         avg = stats["overall"]["avg_score"]
-        avg_str = f"{avg:.0f}%" if avg else "N/A"
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
-                    padding: 20px; border-radius: 10px; text-align: center; color: white;">
-            <h1 style="margin:0; font-size: 2.5em;">{avg_str}</h1>
-            <p style="margin:0;">Avg Score</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
+        st.metric("Avg Score", f"{avg:.0f}%" if avg else "N/A")
     with col3:
-        mastery = stats["overall"]["mastery_count"] or 0
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
-                    padding: 20px; border-radius: 10px; text-align: center; color: white;">
-            <h1 style="margin:0; font-size: 2.5em;">{mastery}</h1>
-            <p style="margin:0;">Mastery Achieved</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
+        st.metric("Mastery Achieved", stats["overall"]["mastery_count"] or 0)
     with col4:
-        questions = stats["overall"]["total_questions"] or 0
-        st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); 
-                    padding: 20px; border-radius: 10px; text-align: center; color: white;">
-            <h1 style="margin:0; font-size: 2.5em;">{questions}</h1>
-            <p style="margin:0;">Questions Answered</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### 🎯 Areas to Improve")
-        weak_topics = get_weak_topics(user_id)
-        if weak_topics:
-            for topic in weak_topics[:5]:
-                accuracy = topic["accuracy"]
-                if accuracy < 40:
-                    color = "#ff4444"
-                    emoji = "🔴"
-                elif accuracy < 60:
-                    color = "#ffaa00"
-                    emoji = "🟡"
-                else:
-                    color = "#44aa44"
-                    emoji = "🟢"
-                
-                st.markdown(f"""
-                <div style="background: #f8f9fa; padding: 10px 15px; border-radius: 8px; 
-                            margin: 5px 0; border-left: 4px solid {color};">
-                    {emoji} <strong>{topic['topic']}</strong>: {accuracy}% 
-                    <span style="color: #888;">({topic['attempts']} attempts)</span>
+        st.metric("Questions Answered", stats["overall"]["total_questions"] or 0)
+
+    st.markdown("### 📈 Recent Performance")
+    if stats["recent"]:
+        for session in stats["recent"]:
+            score = session["final_score"] or 0
+            date = session["created_at"][:10] if session["created_at"] else "Unknown"
+
+            bar_color = "#28a745" if score >= 70 else "#ffc107" if score >= 50 else "#dc3545"
+            st.markdown(f"""
+            <div style="background: #f8f9fa; padding: 10px 15px; border-radius: 8px; margin: 5px 0;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span><strong>{score}%</strong></span>
+                    <span style="color: #888;">{date}</span>
                 </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("💡 Complete more quizzes to see personalized recommendations!")
-    
-    with col2:
-        st.markdown("### 📈 Recent Performance")
-        if stats["recent"]:
-            for session in stats["recent"]:
-                score = session["final_score"] or 0
-                date = session["created_at"][:10] if session["created_at"] else "Unknown"
-                
-                bar_color = "#28a745" if score >= 70 else "#ffc107" if score >= 50 else "#dc3545"
-                st.markdown(f"""
-                <div style="background: #f8f9fa; padding: 10px 15px; border-radius: 8px; margin: 5px 0;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                        <span><strong>{score}%</strong></span>
-                        <span style="color: #888;">{date}</span>
-                    </div>
-                    <div style="background: #e9ecef; border-radius: 4px; height: 8px;">
-                        <div style="background: {bar_color}; width: {score}%; height: 100%; border-radius: 4px;"></div>
-                    </div>
+                <div style="background: #e9ecef; border-radius: 4px; height: 8px;">
+                    <div style="background: {bar_color}; width: {score}%; height: 100%; border-radius: 4px;"></div>
                 </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("📝 No quizzes completed yet. Start one now!")
-    
-    st.markdown("### 📚 Topic Performance Breakdown")
-    if stats["topics"]:
-        import pandas as pd
-        topic_df = pd.DataFrame(stats["topics"])
-        topic_df.columns = ["Topic", "Attempts", "Correct", "Accuracy %"]
-        topic_df = topic_df.sort_values("Accuracy %", ascending=True)
-        st.dataframe(topic_df, use_container_width=True, hide_index=True)
+            </div>
+            """, unsafe_allow_html=True)
     else:
-        st.info("Topic statistics will appear after you complete quizzes!")
+        st.info("📝 No quizzes completed yet. Start one now!")
 
 def render_history():
     st.title("📜 Quiz History")
@@ -1447,7 +1374,6 @@ def render_quiz_complete():
     score = compute_mastery_score(answers)
     total = len(answers)
     correct_count = sum(1 for _, c, _ in answers if c) if answers and len(answers[0]) == 3 else sum(1 for _, c in answers if c)
-    incorrect_count = total - correct_count
     mastery = score >= 70
     is_pdf_mode = st.session_state.get("quiz_mode") == "pdf"
 
@@ -1465,78 +1391,15 @@ def render_quiz_complete():
 
     if mastery:
         st.balloons()
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-                    border: 2px solid #28a745; border-radius: 15px; padding: 20px; margin: 20px 0; text-align: center;">
-            <h2 style="color: #155724; margin: 0;">🏆 Mastery Achieved!</h2>
-            <p style="color: #155724; font-size: 1.2em; margin: 10px 0 0 0;">You've demonstrated strong understanding of the material.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.success("🏆 Mastery Achieved! You've demonstrated strong understanding of the material.")
     else:
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
-                    border: 2px solid #ffc107; border-radius: 15px; padding: 20px; margin: 20px 0; text-align: center;">
-            <h2 style="color: #856404; margin: 0;">📖 Keep Practicing!</h2>
-            <p style="color: #856404; font-size: 1.2em; margin: 10px 0 0 0;">You're making progress. Review the material and try again.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.warning("📖 Keep Practicing! You're making progress. Review the material and try again.")
 
-    # Results Overview with Donut Chart
-    col1, col2 = st.columns([1, 1])
-
+    col1, col2 = st.columns(2)
     with col1:
-        # Metrics cards
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    border-radius: 12px; padding: 20px; margin: 10px 0; text-align: center; color: white;">
-            <div style="font-size: 2.5em; font-weight: bold;">{score}%</div>
-            <div style="font-size: 1em; opacity: 0.9;">Mastery Score</div>
-        </div>
-        """.format(score=score), unsafe_allow_html=True)
-
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-                    border-radius: 12px; padding: 20px; margin: 10px 0; text-align: center; color: white;">
-            <div style="font-size: 2.5em; font-weight: bold;">{correct}/{total}</div>
-            <div style="font-size: 1em; opacity: 0.9;">Questions Correct</div>
-        </div>
-        """.format(correct=correct_count, total=total), unsafe_allow_html=True)
-
+        st.metric("Mastery Score", f"{score}%")
     with col2:
-        # Donut chart using SVG
-        correct_pct = (correct_count / total * 100) if total > 0 else 0
-        incorrect_pct = 100 - correct_pct
-
-        # Calculate stroke dasharray for donut chart (circumference = 2 * pi * r = 2 * 3.14159 * 40 ≈ 251.3)
-        circumference = 251.3
-        correct_dash = correct_pct / 100 * circumference
-        incorrect_dash = incorrect_pct / 100 * circumference
-
-        st.markdown(f"""
-        <div style="text-align: center; padding: 10px;">
-            <svg width="200" height="200" viewBox="0 0 100 100">
-                <!-- Background circle -->
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#e9ecef" stroke-width="12"/>
-                <!-- Incorrect segment (red/gray) -->
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#dc3545" stroke-width="12"
-                        stroke-dasharray="{incorrect_dash} {circumference}"
-                        stroke-dashoffset="0"
-                        transform="rotate(-90 50 50)"/>
-                <!-- Correct segment (green) -->
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#28a745" stroke-width="12"
-                        stroke-dasharray="{correct_dash} {circumference}"
-                        stroke-dashoffset="-{incorrect_dash}"
-                        transform="rotate(-90 50 50)"/>
-                <!-- Center text -->
-                <text x="50" y="45" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">{correct_count}/{total}</text>
-                <text x="50" y="60" text-anchor="middle" font-size="8" fill="#666">Correct</text>
-            </svg>
-            <div style="display: flex; justify-content: center; gap: 20px; margin-top: 10px;">
-                <div><span style="color: #28a745;">●</span> Correct ({correct_count})</div>
-                <div><span style="color: #dc3545;">●</span> Incorrect ({incorrect_count})</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("Questions Correct", f"{correct_count} / {total}")
 
     st.markdown("---")
 
