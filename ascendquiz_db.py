@@ -212,7 +212,7 @@ def generate_prompt(text_chunk):
     """Generate the detailed pedagogical prompt for Gemini to create quiz questions."""
     return f"""
 You are a teacher who is designing a test with multiple choice questions (each with 4 answer choices) to test content from a passage.
-Given the following passage or notes, generate exactly 20 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
+Given the following passage or notes, generate exactly 30 multiple choice questions that test comprehension and critical thinking. The questions must vary in difficulty. If there is not enough content to write 20 good questions, repeat or expand the material, or create additional plausible questions that still test content that is similar to what is in the passage.
 **CRITICAL REQUIREMENT - NO TEXT REFERENCES:**
 - Questions must be COMPLETELY SELF-CONTAINED and not reference the original text
 - DO NOT use phrases like "according to the passage," "the text states," "the first example," "as mentioned," "the author discusses," etc.
@@ -229,7 +229,7 @@ Your goal is to create questions where students CANNOT get the correct answer th
 - Recognizing what "sounds right" based on everyday language
 - Using the question wording itself as a hint to the answer
 - For questions above the remember difficulty band, questions that a student who memorizes information in the reading without true understanding can answer correctly
-Generate exactly 20 questions that vary across difficulty levels. Questions should test **conceptual understanding and application**, not just recall of text. Use the uploaded material to determine:
+Generate exactly 30 questions that vary across difficulty levels. Questions should test **conceptual understanding and application**, not just recall of text. Use the uploaded material to determine:
 1. What concepts are explicitly stated and factual: these support easy or "Remember" questions.
 2. What concepts require connecting multiple ideas or interpreting examples: these support medium or **Understand** or **Apply** questions.
 3. What concepts require analysis of interactions, synthesis, or predicting outcomes based on material in the text → these support medium/hard and hard or **Analyze**, **Evaluate**, or **Create** questions.
@@ -280,7 +280,7 @@ Requires expert-level judgment, design, or synthesis, combining multiple princip
 Multiple answers might seem defensible; students must evaluate, critique, or generate solutions based on passage principles.
 Distractors reflect plausible alternative interpretations, partial understanding, or common advanced mistakes.
 **Requirements**:
-- 5 easy (≥85%), 5 medium (60–84%), 5 medium-hard (40-60%), 5 hard (<40%)
+- 8 easy (≥85%), 7 medium (60–84%), 8 medium-hard (40-60%), 7 hard (<40%)
 **Each question must include the following fields:**
 - "question": A clear, concise, and unambiguous question that tests understanding of concepts from the passage. The question should be COMPLETELY SELF-CONTAINED with all necessary context included. Never reference "the passage," "the text," specific examples by position (first, second, etc.), or figures/tables. Ask about the concept directly.
 - "options": An array of exactly 4 strings in this exact format:
@@ -327,7 +327,7 @@ If the passage contains code, mathematical derivations, or data tables, generate
 - What results mean and why (not "what is the output")
 - When to apply methods (not "what is this method called")
 - Why approaches differ (not "which method is shown")
-Return **only** a valid JSON array of 20 questions. Focus on testing conceptual understanding rather than text memorization.
+Return **only** a valid JSON array of 30 questions. Focus on testing conceptual understanding rather than text memorization.
 Do not include any text, commentary, or markdown fences.
 Output must begin with `[` and end with `]` — no explanations outside JSON.
 Passage:
@@ -341,7 +341,7 @@ def call_gemini_api(prompt):
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.7,
-            "maxOutputTokens": 13000
+            "maxOutputTokens": 20000
         }
     }
     url = f"{GEMINI_URL}?key={API_KEY}"
@@ -823,41 +823,39 @@ def accuracy_on_levels(answers, levels):
     filtered = [item[1] for item in answers if item[0] in levels]
     return sum(filtered) / len(filtered) if filtered else 0
 
+
+## REMOVED CONFIDENCE SCALING AND ADDED A PER-QUESTION ACCUMULATION SYSTEM (w/ penalties)
 def compute_mastery_score(answers):
     """
-    Compute weighted mastery score based on difficulty bands.
-    Higher difficulty tiers are worth more points.
+    Compute mastery score via per-question point accumulation.
+    Correct answers add points based on difficulty; wrong answers deduct
+    a fraction of those points. Score is clamped to [0, 100].
+    Mastery threshold is 70.
     """
     if not answers:
         return 0
 
-    mastery_bands = {
-        (1, 2): 25,    # Easy questions: max 25 points
-        (3, 4): 65,    # Medium questions: max 65 points
-        (5, 6): 85,    # Medium-hard questions: max 85 points
-        (7, 8): 100    # Hard questions: max 100 points
+    BAND_POINTS = {
+        (1, 2): 5,    # Easy
+        (3, 4): 7,    # Medium
+        (5, 6): 9,    # Medium-Hard
+        (7, 8): 10,   # Hard
     }
-    min_attempts_required = 3
-    band_scores = []
+    WRONG_PENALTY_FACTOR = 1 / 3
 
-    for levels, weight in mastery_bands.items():
-        # Handle both 2-tuple (difficulty, correct) and 3-tuple (difficulty, correct, question) formats
-        relevant = [item[1] for item in answers if item[0] in levels]
-        attempts = len(relevant)
-        if attempts == 0:
-            continue
-        acc = sum(relevant) / attempts
-        normalized_score = max((acc - 0.25) / 0.75, 0)
-        if attempts < min_attempts_required:
-            scaled_score = normalized_score * weight * (attempts / min_attempts_required)
-            band_scores.append(scaled_score)
-        else:
-            band_score = normalized_score * weight
-            band_scores.append(band_score)
+    raw_score = 0.0
+    for item in answers:
+        difficulty = item[0]
+        correct = item[1]
+        for levels, points in BAND_POINTS.items():
+            if difficulty in levels:
+                if correct:
+                    raw_score += points
+                else:
+                    raw_score -= points * WRONG_PENALTY_FACTOR
+                break
 
-    if not band_scores:
-        return 0
-    return int(round(max(band_scores)))
+    return int(round(max(0.0, min(100.0, raw_score))))
 
 # ============== UI COMPONENTS ==============
 
@@ -1126,12 +1124,17 @@ def render_quiz():
                 tip_placeholder.info(f"💡 {random.choice(LOADING_TIPS)}")
                 progress_placeholder.markdown("**Validating and organizing questions...**")
 
-                if len(all_questions) < 10:
-                    st.error(f"Only {len(all_questions)} valid questions generated. Need at least 10.")
+                if len(all_questions) < 20:
+                    st.error(f"Only {len(all_questions)} valid questions generated. Need at least 20.")
                     for key in ["pdf_pages", "pdf_name"]:
                         if key in st.session_state:
                             del st.session_state[key]
                     st.stop()
+
+                # Cap pool at exactly 30, preserving difficulty spread
+                if len(all_questions) > 30:
+                    random.shuffle(all_questions)
+                    all_questions = all_questions[:30]
 
                 # Set up quiz state
                 st.session_state.all_questions = all_questions
@@ -1175,7 +1178,7 @@ def render_quiz():
 
         Transform any PDF into an AI-generated adaptive quiz. The system will:
         - Extract key concepts from your document
-        - Generate 20 questions across difficulty levels
+        - Generate 30 questions across difficulty levels
         - Adapt the quiz to your performance in real-time
 
         *Processing takes 1-3 minutes depending on document length.*
@@ -1222,10 +1225,15 @@ def render_quiz():
                         progress_placeholder.markdown("**Step 3/3:** Validating and organizing questions...")
 
                         # Check minimum question requirement
-                        if len(all_questions) < 10:
-                            st.error(f"Only {len(all_questions)} valid questions were generated. Need at least 10. Please try a different PDF.")
+                        if len(all_questions) < 20:
+                            st.error(f"Only {len(all_questions)} valid questions were generated. Need at least 20. Please try a different PDF.")
                             st.session_state.clear()
                             st.stop()
+
+                        # Cap pool at exactly 30, preserving difficulty spread
+                        if len(all_questions) > 30:
+                            random.shuffle(all_questions)
+                            all_questions = all_questions[:30]
 
                         # Set up quiz state
                         st.session_state.all_questions = all_questions
@@ -1588,6 +1596,16 @@ def render_quiz_complete():
             if st.button("📄 Generate New Questions", use_container_width=True):
                 st.session_state.confirm_regenerate = True
                 st.rerun()
+
+        questions_json = json.dumps(st.session_state.all_questions, indent=2)
+        filename = f"ascendquiz_questions_{datetime.now().strftime('%Y-%m-%d')}.json"
+        st.download_button(
+            label="⬇️ Download Question Pool (JSON)",
+            data=questions_json,
+            file_name=filename,
+            mime="application/json",
+            use_container_width=True,
+        )
     else:
         # Demo mode - simpler options
         col1, col2 = st.columns(2)
