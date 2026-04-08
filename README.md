@@ -26,6 +26,22 @@ A key challenges (as of April 2026):
 ### Update: as of Apr 7, 2026
 I decided to overhaul the architecture a bit to simplify the app. In its current configuration I felt it was becoming overly complex and I figured it would be best to optimize the core quizzing functionality before diving into extra features.
 
-The previous version has been saved as "ascendqiz_db_v2.py", and the simplified version has been saved as "ascendquiz_db_v3.py". This newer version has been stripped of some extra features, including the dashboard, history, and demo quiz - I figured this would help us in staying focused on addressing some of the fundamental technical issues. This new version has a fixed 20-question pool, and it doesn't rely on the large prompt call like the previous version did to build out the quiz. Instead, it makes 4 API calls in parallel, one for each difficulty distribution (user selects easy/medium/hard). We still cannot guarantee enough questions will be generated, but it attempts to generate 30 total and proceeds as long as it reaches 20, making 2 attempts before proceeding. This configuration generates enough questions MOST of the time, but still fails occasionally.
+The previous version has been saved as "ascendqiz_db_v2.py", and the simplified version has been saved as "ascendquiz_db_v3.py". This newer version has been stripped of some extra features, including the dashboard, history, and demo quiz - I figured this would help us in staying focused on addressing some of the fundamental technical issues. 
+
+**Updates:**
+- Kept database system
+- Removed dashboard, history, and demo quiz
+- 3 difficulty options with different distribution for each
+  * Easy: 12, 10, 6, 2 -> 30
+  * Medium: 8, 7, 8, 7 -> 30
+  * Hard: 2, 6, 10, 12 -> 30
+  (easy questions, medium questions, medium-hard questions, hard questions)
+- Removed the single giant API call with 4 API calls in parallel, one for each question difficulty
+- Up to 2 tries to generate at least 20 questions; still fails occasionally but less frequently
+- Parallel API calls decrease question generation time significantly (usually 30 seconds - 1 minute)
+- Question explanations have been simplified and put into separate boxes
+- Mastery score has been REMOVED ENTIRELY - we can decide on how to implement this later in a way that like... actually works and isn't stupid
+- Guaranteed 20 question quiz length (if user runs out of, say, easy questions, difficulty flips to medium 🤷)
+- Simple correctness score given at the end, with option to download question pool as a JSON file
 
 I urge my collaborators to try out this new version in the days leading up to our first team meeting, at which point we can decide whether to build on the simplified version or stick to improving the full version. Since we are starting a new quarter with a new team, I personally think it will be easier to start building on top of this simpler version of the app.
