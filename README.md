@@ -20,7 +20,9 @@ Once your environment is set up, run using 'streamlit run ascendquiz_db_v3.py'
 A key challenges (as of April 2026):
 - Having a determined set of quiz questions generated in the question pool at the start of the quiz (current problem: not enough questions are generated, making the quiz sometimes end early due to lack of questions, even if the user answers them correctly). IDEA: running multiple API calls in parallel across difficulty distribution (instead of calling once to generate 12-10-6-2, call twice to generate 6-5-3-1: asking for fewer question per API call should increase reliability)
 - Adding additional features, reworking the "mastery" feature, updating dashboard and history features
-  
+
+<img width="1391" height="786" alt="Screenshot 2026-04-07 at 5 37 55 PM" src="https://github.com/user-attachments/assets/834595f9-7ec2-4c6e-a9f8-1712e72a2a64" />
+
 ### Update: as of Apr 7, 2026
 I decided to overhaul the architecture a bit to simplify the app. In its current configuration I felt it was becoming overly complex and I figured it would be best to optimize the core quizzing functionality before diving into extra features.
 
