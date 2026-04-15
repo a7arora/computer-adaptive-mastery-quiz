@@ -2,7 +2,7 @@
 
 Ascend Quiz is a fully functional Streamlit web app that automatically generates personalized, mastery-driven quizzes from any uploaded PDF (lecture notes, textbook excerpts, etc). Built with Deepseek's R1-0528 API, the app uses generative AI to create high-quality, curriculum-agnostic assessments with adaptive difficulty and real-time feedback.
 
-Main file: [ascendquiz_db_v3.py](https://github.com/tomragus/computer-adaptive-mastery-quiz/blob/main/ascendquiz_db.py)
+Main file: [ascendquiz_db_v3.py](https://github.com/tomragus/computer-adaptive-mastery-quiz/blob/main/ascendquiz_db_v3.py)
 
 ### To run the quiz from your device:
 Download the streamlit library and then set up your "secrets.toml" file (in your directory create a hidden ".stramlit" folder and put into it a "secrets.toml" file containing your Gemini API key: type GEMINI_API_KEY = "key". To get your Gemini API key along with $300 worth of free API credits, create an account on Google AI Studio and go to [https://aistudio.google.com/api-keys](https://aistudio.google.com/api-keys) to get your key).
