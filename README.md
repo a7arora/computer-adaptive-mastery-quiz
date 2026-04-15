@@ -1,109 +1,47 @@
-Ascend Quiz: AI-Powered Computer-Adaptive Mastery-Based Quizzing from Any PDF
+# AscendQuiz: An AI-Powered Adaptive Mastery Quiz 🚀
 
 Ascend Quiz is a fully functional Streamlit web app that automatically generates personalized, mastery-driven quizzes from any uploaded PDF (lecture notes, textbook excerpts, etc). Built with Deepseek's R1-0528 API, the app uses generative AI to create high-quality, curriculum-agnostic assessments with adaptive difficulty and real-time feedback.
 
-Why It Matters: The Pedagogy Behind Ascend Quiz
+Main file: [ascendquiz_db_v3.py](https://github.com/tomragus/computer-adaptive-mastery-quiz/blob/main/ascendquiz_db_v3.py)
 
-Ascend Quiz is more than just an AI demo — it’s grounded in proven learning science and addresses three fundamental gaps in current edtech tools:
+### To run the quiz from your device:
+Download the streamlit library and then set up your "secrets.toml" file (in your directory create a hidden ".stramlit" folder and put into it a "secrets.toml" file containing your Gemini API key: type GEMINI_API_KEY = "key". To get your Gemini API key along with $300 worth of free API credits, create an account on Google AI Studio and go to [https://aistudio.google.com/api-keys](https://aistudio.google.com/api-keys) to get your key).
 
-1. Mastery-Based Learning (MBL)
+Once your environment is set up, run using 'streamlit run ascendquiz_db_v3.py'
 
-As popularized by Sal Khan, mastery-based learning ensures students fully grasp a concept before moving on, unlike traditional models that allow learning gaps to accumulate.
+#### What's new:
+- User authentication — Create account, log back in to see progress
+- Topic tagging — Each question is tagged with a topic (e.g., "Cell Biology", "Algorithms"), enabling per-topic performance tracking
+- Dashboard — View quizzes taken, average score, and potential weaker topics
+- Quiz history — Review all past quiz attempts with scores and mastery status
 
-Research shows that in MBL classrooms, the average student performs as well as the top 15% of traditional classrooms (Kulik et al., 1990).
+### This project is a collaboration between Ashley Zhou, Tom Ragus, Ethan Baquarian, and Timothy Chen. It is a work in progress and we are actively working to improve it.
 
-Ascend Quiz operationalizes this by ending quizzes only when a student demonstrates mastery — defined as correctly answering 5+ questions at high difficulty (Level 6+) with at least 75% accuracy.
+A key challenges (as of April 2026):
+- Having a determined set of quiz questions generated in the question pool at the start of the quiz (current problem: not enough questions are generated, making the quiz sometimes end early due to lack of questions, even if the user answers them correctly). IDEA: running multiple API calls in parallel across difficulty distribution (instead of calling once to generate 12-10-6-2, call twice to generate 6-5-3-1: asking for fewer question per API call should increase reliability)
+- Adding additional features, reworking the "mastery" feature, updating dashboard and history features
 
-2. Computer-Adaptive Testing (CAT)
+<img width="1391" height="786" alt="Screenshot 2026-04-07 at 5 37 55 PM" src="https://github.com/user-attachments/assets/834595f9-7ec2-4c6e-a9f8-1712e72a2a64" />
 
-CAT improves assessment accuracy by dynamically adjusting question difficulty based on a student's responses.
+### Update: as of Apr 7, 2026
+I decided to overhaul the architecture a bit to simplify the app. In its current configuration I felt it was becoming overly complex and I figured it would be best to optimize the core quizzing functionality before diving into extra features.
 
-A 2017 study in Journal of Educational Psychology showed that CAT leads to higher achievement, increased engagement, and greater test precision (Martin & Lazendic, 2017).
+The previous version has been saved as "ascendqiz_db_v2.py", and the simplified version has been saved as "ascendquiz_db_v3.py". This newer version has been stripped of some extra features, including the dashboard, history, and demo quiz - I figured this would help us in staying focused on addressing some of the fundamental technical issues. 
 
-Ascend Quiz uses predicted student accuracy (e.g. “72% of students likely get this right”) to adjust quiz difficulty in real time, starting at ~70% and adapting up or down after each response.
+**Updates:**
+- Kept database system
+- Removed dashboard, history, and demo quiz
+- 3 difficulty options with different distribution for each
+  * Easy: 12, 10, 6, 2 -> 30
+  * Medium: 8, 7, 8, 7 -> 30
+  * Hard: 2, 6, 10, 12 -> 30
+  (easy questions, medium questions, medium-hard questions, hard questions)
+- Removed the single giant API call with 4 API calls in parallel, one for each question difficulty
+- Up to 2 tries to generate at least 20 questions; still fails occasionally but less frequently
+- Parallel API calls decrease question generation time significantly (usually 30 seconds - 1 minute)
+- Question explanations have been simplified and put into separate boxes
+- Mastery score has been REMOVED ENTIRELY - we can decide on how to implement this later in a way that like... actually works and isn't stupid
+- Guaranteed 20 question quiz length (if user runs out of, say, easy questions, difficulty flips to medium 🤷)
+- Simple correctness score given at the end, with option to download question pool as a JSON file
 
-3. The Power of Practice Testing
-
-Decades of cognitive science highlight practice testing (retrieval practice) as one of the most effective learning strategies.
-
-When students test themselves — especially with feedback — they retain more, close knowledge gaps, and better transfer knowledge to new contexts.
-
-Ascend Quiz builds in immediate feedback with explanations after every question, reinforcing learning via active recall and self-explanation.
-
-How It Works
-
-Upload ContentEducators upload a PDF (e.g., lecture notes, textbook chapters).
-
-Question Generation with Difficulty Estimation
-
-The LLM creates 20+ multiple-choice questions with:
-
-4 answer options
-
-Correct answer + explanation
-
-Predicted correctness percentage (e.g. 68% of students expected to get this right)
-
-Adaptive Quiz Loop
-
-Starts with a medium-difficulty question (~70% correctness)
-
-Correct answer → harder question
-
-Incorrect answer → easier question
-
-Quiz stops when mastery is reached
-
-Mastery Determination
-
-Mastery is achieved when a student reaches a mastery score of 70% or higher, with mastery score being weighted based on difficulty tier and shown as a mastery bar to gamify learning
-
-Difficulty Tiering & Error Handling
-
-Questions are grouped into 8 tiers (Very Easy → Very Hard)
-
-Fallback logic ensures smooth user experience even when certain difficulty levels are unavailable.
-
-Technical Overview
-
-Frontend: Streamlit 
-
-Backend:
-
-Deepseek API
-
-Adaptive quiz engine dynamically selects next question
-
-Smart fallback engine searches nearby difficulty bands if needed
-
-Why Ascend Quiz Is Unique
-
-No Rigid Curricula: Unlike ALEKS or IXL, Ascend Quiz works with any input content.
-
-Truly Adaptive: Combines real-time content generation + adaptive delivery — not just static question banks.
-
-Immediate Feedback: Every answer includes rationale and remediation support.
-
-Pedagogical Alignment: Synthesizes best practices in retrieval-based learning, mastery models, and adaptive testing — supported by decades of research.
-
-Tested with Gemini-2.5 Pro with Blind Evaluation of Deepseek-R1 naive prompting questions versus AscendQuiz questions- showed an average question quality of 8.4/10 vs 7.6/10 and average cognitive depth of 5.1/10 vs 3.1/10- showed 0.873 Sperman's Rank Correlation between AscendQuiz difficulty tiers and Gemini predictions, showing that difficulty adaptation is very close to perfect
-
-Future Directions
-
-Support for non-MCQ formats (short answer, open-ended)
-
-Integration with video uploads and transcript parsing
-
-Data collection pipelines to improve difficulty estimation models
-
-Teacher dashboards for group-level insights and intervention planning
-
-References
-
-Kulik, C., Kulik, J., & Bangert-Drowns, R. (1990). Effectiveness of Mastery Learning Programs: A Meta-Analysis. Review of Educational Research.
-
-Khan, S. (2016). Let’s Teach for Mastery, Not Test Scores. TED Talk
-
-Martin, A.J., & Lazendic, G. (2017). Computer-adaptive testing: Implications for students’ achievement, motivation, and engagement. Journal of Educational Psychology.
-
-Roediger, H. L., & Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. Psychological Science.
+I urge my collaborators to try out this new version in the days leading up to our first team meeting, at which point we can decide whether to build on the simplified version or stick to improving the full version. Since we are starting a new quarter with a new team, I personally think it will be easier to start building on top of this simpler version of the app.
